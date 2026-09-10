@@ -1,0 +1,11 @@
+# Game files and decompiled game code belong to poncle. Keep them local only.
+/reference/
+
+# Build output
+bin/
+obj/
+*.user
+
+# direnv / nix
+.direnv/
+result

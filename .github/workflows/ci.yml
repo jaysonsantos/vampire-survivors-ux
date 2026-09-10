@@ -1,0 +1,32 @@
+name: CI
+
+# The mod build needs the interop assemblies that BepInEx makes from the game files.
+# Those files belong to poncle and are not in the repository, so CI cannot build the mod.
+# CI checks the shell scripts and the repository content instead.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check shell scripts
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q shellcheck
+          shellcheck tools/*.sh
+      - name: Check that no game files are in the repository
+        run: |
+          set -e
+          if git ls-files | grep -E '^reference/|\.dll$|\.exe$|global-metadata\.dat$'; then
+            echo "Game files or binaries are in the repository."
+            exit 1
+          fi
+          echo "OK"
+      - name: Check that the C# project restores
+        run: |
+          grep -q '<TargetFramework>net6.0</TargetFramework>' src/QuickRetry/QuickRetry.csproj
