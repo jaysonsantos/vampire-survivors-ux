@@ -1,6 +1,6 @@
-# Vampire Survivors Quick Retry
+# Vampire Survivors UX
 
-A BepInEx mod for Vampire Survivors. It removes menu clicks between runs.
+A BepInEx mod for Vampire Survivors with small UX improvements. It removes menu clicks between runs and in the menus.
 
 On the end-of-run results page, the mod adds three buttons next to **Done**:
 
@@ -30,9 +30,9 @@ Tested on 2026-09-10 with game build `25016043` (v1.16.107, Unity 6000.0.62f1) o
 1. Close the game.
 2. Download `BepInEx-Unity.IL2CPP-win-x64-6.0.0-be.788+5b766a3.zip` from the BepInEx build server.
 3. Extract the zip into the game folder. The folder then contains `winhttp.dll`, `doorstop_config.ini`, `dotnet/`, and `BepInEx/`.
-4. Download `QuickRetry.dll` from the [releases page](https://github.com/jaysonsantos/vampire-survivors-quick-retry/releases) and put it in `BepInEx/plugins/`.
+4. Download `VampireSurvivorsUx.dll` from the [releases page](https://github.com/jaysonsantos/vampire-survivors-ux/releases) and put it in `BepInEx/plugins/`.
 5. Start the game. The first start takes about two minutes. BepInEx builds the interop assemblies in `BepInEx/interop/`.
-6. Check `BepInEx/LogOutput.log`. It must contain `Loading [QuickRetry`.
+6. Check `BepInEx/LogOutput.log`. It must contain `Loading [VampireSurvivorsUx`.
 
 ## Install on Linux and on the Steam Deck
 
@@ -62,10 +62,10 @@ The script `tools/install-loader.sh bepinex` does steps 5 and 6 on a PC with the
 The build needs the interop assemblies that BepInEx makes on the first game start.
 
 ```sh
-nix develop -c dotnet build src/QuickRetry/QuickRetry.csproj -c Release -p:Loader=BepInEx
+nix develop -c dotnet build src/VampireSurvivorsUx/VampireSurvivorsUx.csproj -c Release -p:Loader=BepInEx
 ```
 
-The build copies `QuickRetry.dll` to `BepInEx/plugins/` in the game folder. Set `-p:GamePath=...` when the game is in another folder. Without `nix`, use the .NET 8 SDK.
+The build copies `VampireSurvivorsUx.dll` to `BepInEx/plugins/` in the game folder. Set `-p:GamePath=...` when the game is in another folder. Without `nix`, use the .NET 8 SDK.
 
 `tools/gen-interop.sh` makes the interop assemblies without a game start. See `AGENTS.md` for the development notes.
 

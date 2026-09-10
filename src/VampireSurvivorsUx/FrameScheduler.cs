@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace QuickRetry
+namespace VampireSurvivorsUx
 {
     /// <summary>
     /// Runs actions a fixed number of frames later. The loader entry point calls <see cref="Tick"/> once per frame.

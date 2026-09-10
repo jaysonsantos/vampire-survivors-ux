@@ -1,7 +1,7 @@
-# Vampire Survivors Quick Retry mod
+# Vampire Survivors UX mod
 
-This repo holds a BepInEx mod for Vampire Survivors.
-The mod adds three buttons to the end-of-run recap page:
+This repo holds a BepInEx mod for Vampire Survivors with small UX improvements.
+The first feature adds three buttons to the end-of-run recap page:
 
 - **Retry**: start a new run on the same stage with the same setup.
 - **Next stage**: start a new run on the next stage with the same setup.
@@ -44,10 +44,10 @@ Example setup: 4 characters, all CPU, all `Aggressive`.
 | `reference/decompiled/VampireSurvivors.Runtime/` | Decompiled C# (3017 files). Most game logic is here. |
 | `reference/decompiled/Assembly-CSharp/` | Decompiled C# (8045 files). |
 | `reference/interop/` | Output of `tools/gen-interop.sh`. Interop assemblies made without the game. |
-| `src/QuickRetry/` | The mod. One csproj, one core, two loader entry points. |
+| `src/VampireSurvivorsUx/` | The mod. One csproj, one core, two loader entry points. |
 | `tools/gen-interop.sh` | Makes interop assemblies from `GameAssembly.dll` with Cpp2IL and Il2CppInterop. |
 
-Public repository: `github.com/jaysonsantos/vampire-survivors-quick-retry` (MIT). `README.md` has the install steps for players.
+Public repository: `github.com/jaysonsantos/vampire-survivors-ux` (MIT). `README.md` has the install steps for players.
 
 ## Rules
 
@@ -89,7 +89,7 @@ Stop here if no loader loads. Report the log to the user.
 
 ## Step 2: Build the mod project
 
-The project is `src/QuickRetry/QuickRetry.csproj` (`net6.0`). It supports two loaders with the MSBuild property `Loader`.
+The project is `src/VampireSurvivorsUx/VampireSurvivorsUx.csproj` (`net6.0`). It supports two loaders with the MSBuild property `Loader`.
 
 | Loader | Loader libraries | Interop assemblies | Copy target |
 | --- | --- | --- | --- |
@@ -99,8 +99,8 @@ The project is `src/QuickRetry/QuickRetry.csproj` (`net6.0`). It supports two lo
 Override the paths with `-p:GamePath=...`, `-p:LoaderLibPath=...`, `-p:Il2CppAssembliesPath=...`, and `-p:CopyToMods=false`.
 
 ```sh
-nix develop -c dotnet build src/QuickRetry/QuickRetry.csproj -c Release
-nix develop -c dotnet build src/QuickRetry/QuickRetry.csproj -c Release -p:Loader=BepInEx
+nix develop -c dotnet build src/VampireSurvivorsUx/VampireSurvivorsUx.csproj -c Release
+nix develop -c dotnet build src/VampireSurvivorsUx/VampireSurvivorsUx.csproj -c Release -p:Loader=BepInEx
 ```
 
 The source layout:
@@ -155,7 +155,7 @@ Paths are relative to `reference/decompiled/VampireSurvivors.Runtime/`. Line num
 
 ## Proposed design
 
-This design is implemented in `src/QuickRetry/`.
+This design is implemented in `src/VampireSurvivorsUx/`.
 
 1. **Snapshot.** Harmony postfix on `RecapPage.OnShowStart`. Copy the `Config` run fields, every local slot (character, `AIType`, pad present), `PartySize`, and `PartyModeEnabled` into a static snapshot. A postfix is necessary because `OnShowStart` restores spell-run changes at its end. `AutoSelectStage()` runs later, in `ReturnToLanding()`.
 2. **Buttons.** Same postfix. Clone `_DoneButton` two times. Replace `onClick`. Disable the `I2.Loc.Localize` component on the label and set the text to "Retry" and "Next stage". Set `SelectableUI.IsDefaultSelectedOnPage` to false on the clones. Place the clones left of Done when the parent has no layout group.
@@ -179,7 +179,7 @@ This design is implemented in `src/QuickRetry/`.
 | 2. Party of 4, P1 plus 3 CPU `Aggressive`, Retry | Pass. `PartySize`, all slot characters, and `AIType` restored. |
 | 3. Next stage | Pass. Moongolow to Green Acres, BGM set by the song panel rule. |
 | 4. Done | Pass. The game returns to the landing page. No automatic start. |
-| 5. Log | Pass. No `QuickRetry` errors in `BepInEx/LogOutput.log`. |
+| 5. Log | Pass. No `VampireSurvivorsUx` errors in `BepInEx/LogOutput.log`. |
 | 6. Steam Deck | Not done. |
 
 Facts learned in the tests:
@@ -201,8 +201,8 @@ Notes for GUI automation with `cua-driver` on KDE Wayland:
 2. Set 4 local slots, all CPU, all `Aggressive`. Click Retry. Check all 4 slots and their `AIType`.
 3. Click Next stage. Check that the stage is the next unlocked stage and the slots do not change.
 4. Click Done. Check that the game returns to the main menu as before.
-5. Read the loader log (`MelonLoader/Latest.log` or `BepInEx/LogOutput.log`). It must show no errors from `QuickRetry`. The first recap page logs the Done button parent and layout. Use it to correct the button positions.
-6. Copy `Mods/QuickRetry.dll` to the Steam Deck. Set the same Proton tool and launch option. Repeat tests 1-3.
+5. Read the loader log (`MelonLoader/Latest.log` or `BepInEx/LogOutput.log`). It must show no errors from `VampireSurvivorsUx`. The first recap page logs the Done button parent and layout. Use it to correct the button positions.
+6. Copy `Mods/VampireSurvivorsUx.dll` to the Steam Deck. Set the same Proton tool and launch option. Repeat tests 1-3.
 
 ## When the game updates
 

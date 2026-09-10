@@ -11,9 +11,9 @@
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
-    <AssemblyName>QuickRetry</AssemblyName>
-    <RootNamespace>QuickRetry</RootNamespace>
-    <Version>0.1.0</Version>
+    <AssemblyName>VampireSurvivorsUx</AssemblyName>
+    <RootNamespace>VampireSurvivorsUx</RootNamespace>
+    <Version>0.1.1</Version>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>

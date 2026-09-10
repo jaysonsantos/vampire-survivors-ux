@@ -5,25 +5,25 @@ using BepInEx.Unity.IL2CPP;
 using HarmonyLib;
 using UnityEngine;
 
-namespace QuickRetry
+namespace VampireSurvivorsUx
 {
-    [BepInPlugin("dev.jayson.quickretry", "QuickRetry", QuickRetryCore.Version)]
-    public class QuickRetryPlugin : BasePlugin
+    [BepInPlugin("dev.jayson.vampiresurvivorsux", "VampireSurvivorsUx", QuickRetryCore.Version)]
+    public class VampireSurvivorsUxPlugin : BasePlugin
     {
         public override void Load()
         {
             ModLog.InfoSink = m => Log.LogInfo(m);
             ModLog.WarnSink = m => Log.LogWarning(m);
             ModLog.ErrorSink = m => Log.LogError(m);
-            QuickRetryCore.Initialize(new HarmonyLib.Harmony("dev.jayson.quickretry"));
-            AddComponent<QuickRetryTicker>();
+            QuickRetryCore.Initialize(new HarmonyLib.Harmony("dev.jayson.vampiresurvivorsux"));
+            AddComponent<VampireSurvivorsUxTicker>();
         }
     }
 
     /// <summary>Drives <see cref="FrameScheduler"/>. BepInEx registers this type in IL2CPP on AddComponent.</summary>
-    public class QuickRetryTicker : MonoBehaviour
+    public class VampireSurvivorsUxTicker : MonoBehaviour
     {
-        public QuickRetryTicker(IntPtr ptr) : base(ptr) { }
+        public VampireSurvivorsUxTicker(IntPtr ptr) : base(ptr) { }
 
         private void Update()
         {

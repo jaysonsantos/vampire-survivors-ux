@@ -16,7 +16,7 @@ using Il2CppVampireSurvivors.Objects;
 using Il2CppVampireSurvivors.Objects.Algorithm;
 #endif
 
-namespace QuickRetry
+namespace VampireSurvivorsUx
 {
     /// <summary>A copy of one local co-op slot.</summary>
     internal sealed class SlotSnapshot

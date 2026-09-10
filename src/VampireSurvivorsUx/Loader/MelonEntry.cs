@@ -1,15 +1,15 @@
 #if MELONLOADER
 using HarmonyLib;
 using MelonLoader;
-using QuickRetry;
+using VampireSurvivorsUx;
 
-[assembly: MelonInfo(typeof(QuickRetryMelon), "QuickRetry", QuickRetryCore.Version, "jayson")]
+[assembly: MelonInfo(typeof(VampireSurvivorsUxMelon), "VampireSurvivorsUx", QuickRetryCore.Version, "jayson")]
 [assembly: MelonGame("poncle", "Vampire Survivors")]
 [assembly: HarmonyDontPatchAll]
 
-namespace QuickRetry
+namespace VampireSurvivorsUx
 {
-    public class QuickRetryMelon : MelonMod
+    public class VampireSurvivorsUxMelon : MelonMod
     {
         public override void OnInitializeMelon()
         {

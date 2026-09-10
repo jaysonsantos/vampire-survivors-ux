@@ -29,7 +29,7 @@ using Il2CppVampireSurvivors.Objects;
 using Il2CppVampireSurvivors.UI;
 #endif
 
-namespace QuickRetry
+namespace VampireSurvivorsUx
 {
     internal enum PendingAction
     {
@@ -42,7 +42,7 @@ namespace QuickRetry
     /// <summary>Loader-independent mod logic. The loader entry point calls <see cref="Initialize"/>.</summary>
     internal static class QuickRetryCore
     {
-        public const string Version = "0.1.0";
+        public const string Version = "0.1.1";
         private const string RetryButtonName = "QuickRetry_RetryButton";
         private const string NextStageButtonName = "QuickRetry_NextStageButton";
         private const string NextNewStageButtonName = "QuickRetry_NextNewStageButton";
@@ -55,7 +55,7 @@ namespace QuickRetry
         public static void Initialize(HarmonyLib.Harmony harmony)
         {
             harmony.PatchAll(typeof(QuickRetryCore).Assembly);
-            ModLog.Info("QuickRetry " + Version + " patched.");
+            ModLog.Info("VampireSurvivorsUx " + Version + " patched.");
         }
 
         // ---------------------------------------------------------------- recap page

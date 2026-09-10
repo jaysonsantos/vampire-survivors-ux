@@ -29,4 +29,4 @@ jobs:
           echo "OK"
       - name: Check that the C# project restores
         run: |
-          grep -q '<TargetFramework>net6.0</TargetFramework>' src/QuickRetry/QuickRetry.csproj
+          grep -q '<TargetFramework>net6.0</TargetFramework>' src/VampireSurvivorsUx/VampireSurvivorsUx.csproj

@@ -1,6 +1,6 @@
 using System;
 
-namespace QuickRetry
+namespace VampireSurvivorsUx
 {
     /// <summary>Loader-independent log sink. The loader entry point sets the delegates.</summary>
     internal static class ModLog
