@@ -45,4 +45,4 @@ DOTNET_ROLL_FORWARD=LatestMajor dotnet cli/net6.0/Il2CppInterop.CLI.dll generate
   --use-opt-out-prefixing
 
 echo "Done: $IOP/Il2CppAssemblies"
-ls Il2CppAssemblies | grep -E '^Il2CppVampireSurvivors\.Runtime\.dll$'
+test -f Il2CppAssemblies/Il2CppVampireSurvivors.Runtime.dll
