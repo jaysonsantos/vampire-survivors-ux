@@ -15,6 +15,8 @@ The mod also adds double click to the menus:
 - On the character page, a double click on a character selects and confirms it.
 - In the party size popup and in the CPU type popup, a double click on an option confirms it.
 
+When the game is paused, the mod shows the name of the current stage at the top of the screen.
+
 The buttons do not appear in online runs and in adventures. The mod does not change game data or balance. The game still gives rewards and saves before a new run starts.
 
 ## Requirements

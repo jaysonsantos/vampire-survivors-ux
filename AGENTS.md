@@ -9,6 +9,7 @@ The first feature adds three buttons to the end-of-run recap page:
 
 On the character selection page, a double click on a character selects and confirms it (`SelectCharacter(false)` then `ConfirmCharacter()` one frame later). This works in solo and in party mode.
 In the party size and CPU type popups (`LargeMultiOptionPopup`), a second click on the same option within 0.45 s confirms it (postfix on `SelectOption(GameObject)` calls `Confirm()`).
+The pause page shows the name of the current stage at the top (postfix on `PausePage.OnShowStart`).
 
 "Setup" means the main character, the local co-op slots (character and CPU behaviour), the stage, the BGM, and the run modifiers.
 Example setup: 4 characters, all CPU, all `Aggressive`.
@@ -107,6 +108,7 @@ The source layout:
 
 - `QuickRetryCore.cs`: Harmony patches, buttons, next-stage rule, start of the run.
 - `RunSnapshot.cs`: capture and restore of the run setup.
+- `PauseStageName.cs`: stage name label on the pause page.
 - `FrameScheduler.cs`: runs an action some frames later. The loader entry point ticks it.
 - `ModLog.cs`: log sink that the loader entry point sets.
 - `Loader/MelonEntry.cs`, `Loader/BepInExEntry.cs`: entry points. Only one is compiled.
@@ -147,6 +149,12 @@ Paths are relative to `reference/decompiled/VampireSurvivors.Runtime/`. Line num
   - `OnShowStart` ends with `_spellsManager.RestoreCachedPlayerSettings()` (line 450). Spell runs change stage and character during the run. Take the snapshot after this call.
   - `_DoneButton` is a `Selectable`. Its click is a persistent `UnityEvent` listener from the prefab. `RemoveAllListeners()` does not remove it. Replace `onClick` with a new `ButtonClickedEvent` on the clone.
 - `VampireSurvivors/GameStateRecap.cs`: on `RecapPageCompletedSignal`, it fires `RETURN_TO_LANDING` and loads `ScenePreloader`.
+
+### Pause page
+
+- `VampireSurvivors/PausePage.cs`: `OnShowStart` (line 174) builds the page each time the game pauses. `_ResumeButton` (line 72) is a `RectTransform` with a `TextMeshProUGUI` label.
+- `VampireSurvivors.Objects/Stage.cs`: `GM.Core.Stage.StageType` and `ActiveStageData` (line 353) give the current stage.
+- `VampireSurvivors.Data.Stage/StageData.cs:254`: `GetLocalizedName(StageType)` returns the I2 term `stageLang/{TYPE}stageName`. `LocalizationManager.GetTranslation(term)` gives the text. `stageName` is the English fallback.
 
 ### Other references
 
