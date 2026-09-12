@@ -1,19 +1,23 @@
 using System;
-using System.Runtime.InteropServices;
 using System.Text;
+#if IL2CPP
+using System.Runtime.InteropServices;
 using Il2CppInterop.Runtime;
 using Il2CppInterop.Runtime.InteropTypes;
 using Il2CppSystem.Collections.Generic;
-#if BEPINEX
-using VampireSurvivors.Data;
-using VampireSurvivors.Framework;
-using VampireSurvivors.Objects;
-using VampireSurvivors.Objects.Algorithm;
 #else
+using System.Collections.Generic;
+#endif
+#if MELONLOADER
 using Il2CppVampireSurvivors.Data;
 using Il2CppVampireSurvivors.Framework;
 using Il2CppVampireSurvivors.Objects;
 using Il2CppVampireSurvivors.Objects.Algorithm;
+#else
+using VampireSurvivors.Data;
+using VampireSurvivors.Framework;
+using VampireSurvivors.Objects;
+using VampireSurvivors.Objects.Algorithm;
 #endif
 
 namespace VampireSurvivorsUx
@@ -176,12 +180,15 @@ namespace VampireSurvivorsUx
     }
 
     /// <summary>
-    /// Raw access to <c>MultiplayerManager.PartySize</c> (<c>int?</c>).
-    /// IL2CPP boxes an empty <c>Nullable</c> as null, so the generated getter throws. This reads the struct bytes in place.
-    /// The interop field offsets of a value type include the 16 byte object header, so subtract it.
+    /// Access to <c>MultiplayerManager.PartySize</c> (<c>int?</c>).
+    /// On Mono the field is a plain <c>Nullable</c>.
+    /// IL2CPP boxes an empty <c>Nullable</c> as null, so the generated getter throws. The IL2CPP build reads the
+    /// struct bytes in place. The interop field offsets of a value type include the 16 byte object header,
+    /// so subtract it.
     /// </summary>
     internal static class PartySizeField
     {
+#if IL2CPP
         private static bool _ready;
         private static int _baseOffset;
         private static int _hasValueOffset;
@@ -231,5 +238,18 @@ namespace VampireSurvivorsUx
             Marshal.WriteInt32(obj, _baseOffset + _valueOffset, size);
             Marshal.WriteByte(obj, _baseOffset + _hasValueOffset, 1);
         }
+#else
+        public static bool TryRead(MultiplayerManager manager, out int size)
+        {
+            int? value = manager.PartySize;
+            size = value ?? 0;
+            return value.HasValue;
+        }
+
+        public static void Write(MultiplayerManager manager, int size)
+        {
+            manager.PartySize = size;
+        }
+#endif
     }
 }

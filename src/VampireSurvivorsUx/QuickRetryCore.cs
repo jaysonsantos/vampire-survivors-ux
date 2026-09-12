@@ -1,22 +1,10 @@
 using System;
 using HarmonyLib;
-using Il2CppInterop.Runtime;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
-#if BEPINEX
-// BepInEx generates the interop assemblies without a namespace prefix.
-using I2.Loc;
-using TMPro;
-using VampireSurvivors;
-using VampireSurvivors.App.Scripts.Framework.Adventures;
-using VampireSurvivors.Data;
-using VampireSurvivors.Data.Stage;
-using VampireSurvivors.Framework;
-using VampireSurvivors.Objects;
-using VampireSurvivors.UI;
-#else
+#if MELONLOADER
 // MelonLoader generates the interop assemblies with the Il2Cpp namespace prefix.
 using Il2CppI2.Loc;
 using Il2CppTMPro;
@@ -27,6 +15,17 @@ using Il2CppVampireSurvivors.Data.Stage;
 using Il2CppVampireSurvivors.Framework;
 using Il2CppVampireSurvivors.Objects;
 using Il2CppVampireSurvivors.UI;
+#else
+// The BepInEx interop assemblies and the Mono game assemblies have no namespace prefix.
+using I2.Loc;
+using TMPro;
+using VampireSurvivors;
+using VampireSurvivors.App.Scripts.Framework.Adventures;
+using VampireSurvivors.Data;
+using VampireSurvivors.Data.Stage;
+using VampireSurvivors.Framework;
+using VampireSurvivors.Objects;
+using VampireSurvivors.UI;
 #endif
 
 namespace VampireSurvivorsUx
@@ -88,7 +87,7 @@ namespace VampireSurvivorsUx
                 return;
             }
 
-            PlayerOptions options = page._playerOptions ?? SystemPlatform.Instance?.PlayerOptions;
+            PlayerOptions options = Priv.PlayerOptionsOf(page) ?? SystemPlatform.Instance?.PlayerOptions;
             MultiplayerManager multiplayer = MultiplayerManager.Instance;
             if (options == null)
             {
@@ -127,7 +126,7 @@ namespace VampireSurvivorsUx
 
         private static void SetButtonsActive(RecapPage page, bool active)
         {
-            Selectable done = page._DoneButton;
+            Selectable done = Priv.DoneButton(page);
             if (done == null) return;
             Transform parent = done.transform.parent;
             if (parent == null) return;
@@ -141,7 +140,7 @@ namespace VampireSurvivorsUx
 
         private static void EnsureButtons(RecapPage page)
         {
-            Selectable done = page._DoneButton;
+            Selectable done = Priv.DoneButton(page);
             if (done == null)
             {
                 ModLog.Warn("_DoneButton is null. Buttons not added.");
@@ -153,7 +152,7 @@ namespace VampireSurvivorsUx
 
             LayoutGroup layout = parent != null ? parent.GetComponent<LayoutGroup>() : null;
             ModLog.Info("Done button parent=" + (parent != null ? parent.name : "null")
-                + " layout=" + (layout != null ? layout.GetIl2CppType().Name : "none")
+                + " layout=" + (layout != null ? Interop.TypeNameOf(layout) : "none")
                 + " width=" + width
                 + " anchoredPos=" + (doneRect != null ? doneRect.anchoredPosition.ToString() : "?"));
 
@@ -224,7 +223,7 @@ namespace VampireSurvivorsUx
                 return null;
             }
             button.onClick = new Button.ButtonClickedEvent();
-            button.onClick.AddListener(DelegateSupport.ConvertDelegate<UnityAction>(onClick));
+            button.onClick.AddListener(Interop.ToUnityAction(onClick));
             return clone;
         }
 
@@ -320,13 +319,19 @@ namespace VampireSurvivorsUx
         {
             next = current;
             nextData = null;
-            Il2CppSystem.Collections.Generic.List<StageType> completed = null;
+            // Copy the completion log into a managed set. The game list type differs between IL2CPP and Mono.
+            System.Collections.Generic.HashSet<StageType> completed = null;
             if (incompleteFor.HasValue)
             {
                 var log = options.Config.StageCompletionLog;
-                if (log != null && log.ContainsKey(incompleteFor.Value)) completed = log[incompleteFor.Value];
+                if (log != null && log.ContainsKey(incompleteFor.Value))
+                {
+                    var done = log[incompleteFor.Value];
+                    completed = new System.Collections.Generic.HashSet<StageType>();
+                    for (int i = 0; done != null && i < done.Count; i++) completed.Add(done[i]);
+                }
             }
-            Il2CppSystem.Collections.Generic.Dictionary<StageType, Il2CppSystem.Collections.Generic.List<StageData>> available = StageSelectPage.GetAvailableStages(data, options);
+            var available = StageSelectPage.GetAvailableStages(data, options);
             if (available == null) return false;
 
             var ordered = new System.Collections.Generic.List<(int order, StageType type, StageData data)>();
@@ -334,7 +339,7 @@ namespace VampireSurvivorsUx
             {
                 if (type == StageType.STAGEX || type == StageType.MACHINE || type == StageType.MACHINE2) continue;
                 if (!available.ContainsKey(type)) continue;
-                Il2CppSystem.Collections.Generic.List<StageData> list = available[type];
+                var list = available[type];
                 if (list == null || list.Count == 0) continue;
                 StageData sd = list[0];
                 if (sd == null || !sd.unlocked) continue;
@@ -392,7 +397,7 @@ namespace VampireSurvivorsUx
         // ---------------------------------------------------------------- character double click
 
         private const float DoubleClickSeconds = 0.45f;
-        private static IntPtr _lastClickedItem;
+        private static ObjId _lastClickedItem;
         private static float _lastClickTime;
 
         /// <summary>Called every frame by the loader entry point. A double click on a character selects and confirms it.</summary>
@@ -404,12 +409,12 @@ namespace VampireSurvivorsUx
                 EventSystem es = EventSystem.current;
                 GameObject selected = es != null ? es.currentSelectedGameObject : null;
                 CharacterItemUI item = selected != null ? selected.GetComponent<CharacterItemUI>() : null;
-                if (item == null) { _lastClickedItem = IntPtr.Zero; return; }
+                if (item == null) { _lastClickedItem = ObjId.None; return; }
 
-                IntPtr ptr = item.Pointer;
+                ObjId id = ObjId.Of(item);
                 float now = Time.unscaledTime;
-                bool isDouble = ptr == _lastClickedItem && now - _lastClickTime <= DoubleClickSeconds;
-                _lastClickedItem = isDouble ? IntPtr.Zero : ptr;
+                bool isDouble = id.Same(_lastClickedItem) && now - _lastClickTime <= DoubleClickSeconds;
+                _lastClickedItem = isDouble ? ObjId.None : id;
                 _lastClickTime = now;
                 if (!isDouble) return;
 
@@ -435,7 +440,7 @@ namespace VampireSurvivorsUx
 
         // ---------------------------------------------------------------- popup double click
 
-        private static IntPtr _lastPopup;
+        private static ObjId _lastPopup;
         private static int _lastPopupIndex = -1;
         private static float _lastPopupTime;
 
@@ -450,11 +455,11 @@ namespace VampireSurvivorsUx
             {
                 try
                 {
-                    IntPtr ptr = __instance.Pointer;
-                    int index = __instance._selectedIndex;
+                    ObjId id = ObjId.Of(__instance);
+                    int index = Priv.SelectedIndex(__instance);
                     float now = Time.unscaledTime;
-                    bool isDouble = ptr == _lastPopup && index == _lastPopupIndex && now - _lastPopupTime <= DoubleClickSeconds;
-                    _lastPopup = isDouble ? IntPtr.Zero : ptr;
+                    bool isDouble = id.Same(_lastPopup) && index == _lastPopupIndex && now - _lastPopupTime <= DoubleClickSeconds;
+                    _lastPopup = isDouble ? ObjId.None : id;
                     _lastPopupIndex = index;
                     _lastPopupTime = now;
                     if (!isDouble) return;
@@ -484,7 +489,7 @@ namespace VampireSurvivorsUx
                 FrameScheduler.RunAfterFrames(2, () =>
                 {
                     AppStateMachine sm = AppStateMachine.Instance;
-                    if (sm == null || sm.CurrentState == null || sm.CurrentState.TryCast<AppLandingPageState>() == null) return;
+                    if (sm == null || !Interop.Is<AppLandingPageState>(sm.CurrentState)) return;
                     sm.FireEvent("MAIN_MENU");
                 });
             }
@@ -546,7 +551,7 @@ namespace VampireSurvivorsUx
                 return;
             }
             var state = sm.CurrentState;
-            if (state == null || state.TryCast<AppMainMenuState>() == null)
+            if (!Interop.Is<AppMainMenuState>(state))
             {
                 ModLog.Error("Start: app state is not the main menu. Aborting.");
                 return;

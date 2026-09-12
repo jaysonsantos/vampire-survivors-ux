@@ -17,6 +17,7 @@ Example setup: 4 characters, all CPU, all `Aggressive`.
 ## Scope
 
 - Target the Windows build of the game (IL2CPP) with BepInEx. On Linux and on the Steam Deck, run it under Proton.
+- Target the macOS build of the game (Mono) with BepInEx 5. See "macOS port".
 - Use the same setup on the PC and on the Steam Deck.
 - Support offline runs only. Hide the buttons in online runs.
 - Do not change game data or balance.
@@ -45,7 +46,8 @@ Example setup: 4 characters, all CPU, all `Aggressive`.
 | `reference/decompiled/VampireSurvivors.Runtime/` | Decompiled C# (3017 files). Most game logic is here. |
 | `reference/decompiled/Assembly-CSharp/` | Decompiled C# (8045 files). |
 | `reference/interop/` | Output of `tools/gen-interop.sh`. Interop assemblies made without the game. |
-| `src/VampireSurvivorsUx/` | The mod. One csproj, one core, two loader entry points. |
+| `src/VampireSurvivorsUx/` | The mod. One csproj, one core, three loader entry points. |
+| `reference/loaders/` | Loader zip files that `tools/install-loader.sh` downloads. |
 | `tools/gen-interop.sh` | Makes interop assemblies from `GameAssembly.dll` with Cpp2IL and Il2CppInterop. |
 
 Public repository: `github.com/jaysonsantos/vampire-survivors-ux` (MIT). `README.md` has the install steps for players.
@@ -56,7 +58,8 @@ Public repository: `github.com/jaysonsantos/vampire-survivors-ux` (MIT). `README
 - Add new tools to `flake.nix`. Do not install system packages with `pacman`.
 - Never commit `reference/`, game DLLs, or decompiled game code. They belong to poncle.
 - Read logic in the decompiled Mono code. The IL2CPP build has the same types and methods.
-- MelonLoader adds an `Il2Cpp` prefix to namespaces and file names: `Il2CppVampireSurvivors.UI.RecapPage` in `Il2CppVampireSurvivors.Runtime.dll`. BepInEx adds no prefix: `VampireSurvivors.UI.RecapPage` in `VampireSurvivors.Runtime.dll`. `Il2CppSystem` and `Il2Cppmscorlib.dll` keep the prefix in both. The source uses `#if BEPINEX` blocks for the using directives.
+- MelonLoader adds an `Il2Cpp` prefix to namespaces and file names: `Il2CppVampireSurvivors.UI.RecapPage` in `Il2CppVampireSurvivors.Runtime.dll`. BepInEx and the Mono build add no prefix: `VampireSurvivors.UI.RecapPage` in `VampireSurvivors.Runtime.dll`. `Il2CppSystem` and `Il2Cppmscorlib.dll` keep the prefix in MelonLoader and BepInEx. The source uses `#if MELONLOADER` blocks for the using directives.
+- Two more compile symbols select the runtime: `IL2CPP` for MelonLoader and BepInEx, `MONO` for BepInEx 5 on the macOS build. Put all runtime differences in `Interop.cs`.
 - Write documentation, commit bodies, and PR descriptions in STE. Follow `~/.agents/skills/ste-writing/SKILL.md`.
 - Before you start work, check that the current branch is up to date with `origin/main`, if a remote exists.
 
@@ -90,18 +93,23 @@ Stop here if no loader loads. Report the log to the user.
 
 ## Step 2: Build the mod project
 
-The project is `src/VampireSurvivorsUx/VampireSurvivorsUx.csproj` (`net6.0`). It supports two loaders with the MSBuild property `Loader`.
+The project is `src/VampireSurvivorsUx/VampireSurvivorsUx.csproj`. It supports three loaders with the MSBuild
+property `Loader`. Each loader writes to `bin/$(Configuration)/$(Loader)/`, so a stale DLL cannot hide in a
+shared folder.
 
-| Loader | Loader libraries | Interop assemblies | Copy target |
-| --- | --- | --- | --- |
-| `BepInEx` (use this) | `$(GamePath)/BepInEx/core/` | `$(GamePath)/BepInEx/interop/` | `$(GamePath)/BepInEx/plugins/` |
-| `MelonLoader` (default for history, does not run on this build) | `$(GamePath)/MelonLoader/net6/` | `$(GamePath)/MelonLoader/Il2CppAssemblies/` | `$(GamePath)/Mods/` |
+| Loader | Target | Loader libraries | Game assemblies | Copy target |
+| --- | --- | --- | --- | --- |
+| `BepInEx` (Windows build) | `net6.0` | `$(GamePath)/BepInEx/core/` | `$(GamePath)/BepInEx/interop/` | `$(GamePath)/BepInEx/plugins/` |
+| `BepInExMono` (macOS build) | `netstandard2.1` | `$(GamePath)/BepInEx/core/` | `$(GamePath)/Vampire_Survivors.app/Contents/Resources/Data/Managed/` | `$(GamePath)/BepInEx/plugins/` |
+| `MelonLoader` (default for history, does not run on this build) | `net6.0` | `$(GamePath)/MelonLoader/net6/` | `$(GamePath)/MelonLoader/Il2CppAssemblies/` | `$(GamePath)/Mods/` |
 
-Override the paths with `-p:GamePath=...`, `-p:LoaderLibPath=...`, `-p:Il2CppAssembliesPath=...`, and `-p:CopyToMods=false`.
+Override the paths with `-p:GamePath=...`, `-p:LoaderLibPath=...`, `-p:GameAsmPath=...`, and
+`-p:CopyToMods=false`. The old name `-p:Il2CppAssembliesPath=...` still works.
 
 ```sh
 nix develop -c dotnet build src/VampireSurvivorsUx/VampireSurvivorsUx.csproj -c Release
 nix develop -c dotnet build src/VampireSurvivorsUx/VampireSurvivorsUx.csproj -c Release -p:Loader=BepInEx
+nix develop -c dotnet build src/VampireSurvivorsUx/VampireSurvivorsUx.csproj -c Release -p:Loader=BepInExMono
 ```
 
 The source layout:
@@ -111,9 +119,20 @@ The source layout:
 - `PauseStageName.cs`: stage name label on the pause page.
 - `FrameScheduler.cs`: runs an action some frames later. The loader entry point ticks it.
 - `ModLog.cs`: log sink that the loader entry point sets.
-- `Loader/MelonEntry.cs`, `Loader/BepInExEntry.cs`: entry points. Only one is compiled.
+- `Interop.cs`: the IL2CPP and Mono differences. Object identity, delegate conversion, type casts, and the
+  private game fields.
+- `Loader/MelonEntry.cs`, `Loader/BepInExEntry.cs`, `Loader/BepInExMonoEntry.cs`: entry points. Only one is compiled.
 
-To compile without the game, run `tools/gen-interop.sh` and build with `-p:Il2CppAssembliesPath=reference/interop/Il2CppAssemblies -p:LoaderLibPath=<extracted loader zip>/... -p:CopyToMods=false`.
+To compile the IL2CPP build without the game, run `tools/gen-interop.sh` and build with
+`-p:GameAsmPath=reference/interop/Il2CppAssemblies -p:LoaderLibPath=<extracted loader zip>/... -p:CopyToMods=false`.
+
+To compile the Mono build on a machine without the macOS game, use the reference copies:
+
+```sh
+nix develop -c dotnet build src/VampireSurvivorsUx/VampireSurvivorsUx.csproj -c Release -p:Loader=BepInExMono \
+  -p:GameAsmPath=$PWD/reference/managed-mono-build25016043 \
+  -p:LoaderLibPath=$PWD/reference/loaders/bepinex5/BepInEx/core -p:CopyToMods=false
+```
 
 ## Game code map
 
@@ -203,6 +222,49 @@ Notes for GUI automation with `cua-driver` on KDE Wayland:
 - Mouse clicks work on popups, quick start, the pause menu, and the recap buttons. The Confirm button on the character page and the START button on the stage page ignore mouse clicks. Use Return there.
 - Escape on the stage page goes back to the character page and clears the party setup.
 
+## macOS port
+
+Facts checked on 2026-09-12 on macOS 26.6.2, Apple M4 Pro, game build `25016043`.
+
+- The macOS build uses **Mono**, not IL2CPP: `Vampire_Survivors.app/Contents/MonoBleedingEdge/`,
+  `Contents/Frameworks/libmonobdwgc-2.0.dylib`, `Contents/Resources/Data/Managed/` (261 assemblies).
+- The main executable and `UnityPlayer.dylib` are universal binaries (`x86_64` and `arm64`).
+- The managed assemblies match the Linux Mono build of the same build ID. Use
+  `reference/managed-mono-build25016043/` as the reference for a build on a PC.
+- The app bundle has an ad-hoc signature and no hardened runtime. `DYLD_INSERT_LIBRARIES` works.
+- Loader choice: **BepInEx 5.4.23.5, `BepInEx_macos_universal`**. It is the only loader with an `arm64` Doorstop.
+  The bleeding edge builds have `BepInEx-Unity.Mono-macos-x64` only.
+- `UnityPlayer.dylib` does not link `libmonobdwgc-2.0.dylib`. Unity 6 loads Mono with `dlopen`. Doorstop 4.5.0
+  handles this: it hooks `dlopen` and `dlsym` with `plthook`.
+- The game must run as **`x86_64` under Rosetta 2**. The MonoMod build in BepInEx 5 (2022) has no `arm64`
+  detour backend, so `DetourHelper.Native` is null. A native `arm64` start fails in the preloader with
+  `HarmonyException: IL Compile Error` and `NullReferenceException` in `DetourHelper.GetIdentifiable`. The
+  preloader writes the stack to `Vampire_Survivors.app/Contents/MacOS/preloader_<date>.log`.
+- Patch `run_bepinex.sh`: `ARCHPREFERENCE="x86_64,arm64"` and `exec arch -x86_64 -e ...`. Also set
+  `executable_name="Vampire_Survivors.app"`. `tools/install-loader.sh bepinex-macos` does all of it.
+- Steam launch option: `"<game folder>/run_bepinex.sh" %command%`.
+- BepInEx writes `BepInEx/LogOutput.log` in the game folder, next to the app bundle.
+- The Mono assemblies keep the access level of the game fields. `RecapPage._DoneButton`,
+  `RecapPage._playerOptions`, `PausePage._ResumeButton`, and `LargeMultiOptionPopup._selectedIndex` are not
+  public. `Priv` in `Interop.cs` reads them with reflection. The IL2CPP interop assemblies make every field
+  public, so that build reads them direct.
+- `MultiplayerManager.PartySize` is a plain `int?` field on Mono. The `Marshal` work-around is for IL2CPP only.
+- `StateMachine.CurrentState` is a `StateMachineState`. Mono uses `is`, IL2CPP uses `TryCast<T>()`.
+- IL2CPP interop makes a new managed wrapper on every call, so the double click code compares the native
+  pointer. Mono compares the object reference. `ObjId` in `Interop.cs` hides the difference.
+
+## Test results (macOS, 2026-09-12, BepInEx 5.4.23.5, build 25016043)
+
+| Test | Result |
+| --- | --- |
+| 1. BepInEx loads | Pass. `BepInEx 5.4.23.5`, `Detected Unity version: v6000.0.62f1`, `1 plugin to load`. |
+| 2. Plugin loads | Pass. `Loading [VampireSurvivorsUx 0.1.1]`, `VampireSurvivorsUx 0.1.1 patched.` |
+| 3. Harmony patches run | Pass. The popup and character double click log `confirming` and no error. |
+| 4. Log | Pass. No `Error` or `Warning` lines in `BepInEx/LogOutput.log`. |
+| 5. Pause page stage name | Pass. `Pause page: stage label added. root=View - Paused size=(1920.00, 1200.00)`. |
+| 6. Recap page buttons | Pass. `Done button parent=ButtonContainer layout=HorizontalLayoutGroup`. Three clones added. |
+| 7. Next new, party of 4 | Pass. `EX_MAZERELLA -> TOWERBRIDGE`, BGM `BGM_Bridge`, all 4 slots and `PartySize` restored, `START_GAME` fired. |
+
 ## Test plan
 
 1. Play a solo run and die. Click Retry. Check the character and the stage. Check that gold and achievements are saved.
@@ -210,7 +272,10 @@ Notes for GUI automation with `cua-driver` on KDE Wayland:
 3. Click Next stage. Check that the stage is the next unlocked stage and the slots do not change.
 4. Click Done. Check that the game returns to the main menu as before.
 5. Read the loader log (`MelonLoader/Latest.log` or `BepInEx/LogOutput.log`). It must show no errors from `VampireSurvivorsUx`. The first recap page logs the Done button parent and layout. Use it to correct the button positions.
-6. Copy `Mods/VampireSurvivorsUx.dll` to the Steam Deck. Set the same Proton tool and launch option. Repeat tests 1-3.
+6. Copy `bin/Release/BepInEx/VampireSurvivorsUx.dll` to the Steam Deck. Set the same Proton tool and launch option. Repeat tests 1-3.
+7. On macOS, install with `tools/install-loader.sh bepinex-macos`, copy
+   `bin/Release/BepInExMono/VampireSurvivorsUx.dll` to `BepInEx/plugins/`, set the Steam launch option, and
+   repeat tests 1-5.
 
 ## When the game updates
 

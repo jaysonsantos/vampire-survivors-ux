@@ -21,11 +21,17 @@ The buttons do not appear in online runs and in adventures. The mod does not cha
 
 ## Requirements
 
-- Vampire Survivors, the **Windows** build (`VampireSurvivors.exe` is a `PE32+` file). The Linux and macOS builds use Mono and do not work with this mod.
-- [BepInEx Unity.IL2CPP, bleeding edge build 788](https://builds.bepinex.dev/projects/bepinex_be) or newer.
-- On Linux and on the Steam Deck: Proton 10 or newer.
+The mod has two builds. Pick the one for your platform.
+
+| Platform | Game build | Loader |
+| --- | --- | --- |
+| Windows, Linux, Steam Deck | Windows build (`VampireSurvivors.exe` is a `PE32+` file), IL2CPP | [BepInEx Unity.IL2CPP, bleeding edge build 788](https://builds.bepinex.dev/projects/bepinex_be) or newer |
+| macOS | macOS build (`Vampire_Survivors.app`), Mono | [BepInEx 5.4.23.5, macOS universal](https://github.com/BepInEx/BepInEx/releases) |
+
+On Linux and on the Steam Deck, force Proton. The native Linux build uses Mono and does not work with either build of the mod.
 
 Tested on 2026-09-10 with game build `25016043` (v1.16.107, Unity 6000.0.62f1) on Linux with Proton.
+Tested on 2026-09-12 with the same game build on macOS 26 (Apple M4 Pro).
 
 ## Install on Windows
 
@@ -64,16 +70,42 @@ The script `tools/install-loader.sh bepinex` does steps 5 and 6 on a PC with the
 The build needs the interop assemblies that BepInEx makes on the first game start.
 
 ```sh
+# Windows, Linux, Steam Deck (IL2CPP)
 nix develop -c dotnet build src/VampireSurvivorsUx/VampireSurvivorsUx.csproj -c Release -p:Loader=BepInEx
+# macOS (Mono)
+nix develop -c dotnet build src/VampireSurvivorsUx/VampireSurvivorsUx.csproj -c Release -p:Loader=BepInExMono
 ```
 
-The build copies `VampireSurvivorsUx.dll` to `BepInEx/plugins/` in the game folder. Set `-p:GamePath=...` when the game is in another folder. Without `nix`, use the .NET 8 SDK.
+The build writes `bin/Release/<Loader>/VampireSurvivorsUx.dll` and copies it to `BepInEx/plugins/` in the game
+folder. Set `-p:GamePath=...` when the game is in another folder. Without `nix`, use the .NET 8 SDK.
 
 `tools/gen-interop.sh` makes the interop assemblies without a game start. See `AGENTS.md` for the development notes.
 
-## macOS
+## Install on macOS
 
-Not supported at this time. The macOS build of the game uses Mono, and this mod uses the IL2CPP interop layer. A Mono variant of the mod needs a different build and a test on a Mac.
+The macOS build of the game uses Mono, so it needs BepInEx 5 and the `BepInExMono` build of the mod.
+Rosetta 2 must be installed. The loader runs the game as `x86_64`, because the detour library in BepInEx 5
+cannot patch `arm64` code.
+
+1. Close the game.
+2. Download `BepInEx_macos_universal_5.4.23.5.zip` and extract it into the game folder
+   (`~/Library/Application Support/Steam/steamapps/common/Vampire Survivors`). The folder then contains
+   `libdoorstop.dylib`, `run_bepinex.sh`, and `BepInEx/`, next to `Vampire_Survivors.app`.
+3. Edit `run_bepinex.sh`:
+   - Set `executable_name="Vampire_Survivors.app"`.
+   - Change `export ARCHPREFERENCE="arm64,x86_64"` to `export ARCHPREFERENCE="x86_64,arm64"`.
+   - Change `exec arch -e ...` to `exec arch -x86_64 -e ...`.
+4. Run `chmod +x run_bepinex.sh`.
+5. Download `VampireSurvivorsUx-mono.dll`, rename it to `VampireSurvivorsUx.dll`, and put it in `BepInEx/plugins/`.
+6. In Steam, open *Vampire Survivors → Properties → General* and set the launch option:
+
+   ```text
+   "/Users/<you>/Library/Application Support/Steam/steamapps/common/Vampire Survivors/run_bepinex.sh" %command%
+   ```
+
+7. Start the game and check `BepInEx/LogOutput.log`. It must contain `Loading [VampireSurvivorsUx`.
+
+The script `tools/install-loader.sh bepinex-macos` does steps 2 to 4 on a Mac with the repository.
 
 ## License
 
