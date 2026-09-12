@@ -10,6 +10,9 @@ The first feature adds three buttons to the end-of-run recap page:
 On the character selection page, a double click on a character selects and confirms it (`SelectCharacter(false)` then `ConfirmCharacter()` one frame later). This works in solo and in party mode.
 In the party size and CPU type popups (`LargeMultiOptionPopup`), a second click on the same option within 0.45 s confirms it (postfix on `SelectOption(GameObject)` calls `Confirm()`).
 The pause page shows the name of the current stage at the top (postfix on `PausePage.OnShowStart`).
+A double click on an arcana card selects and confirms it, in place of a click on the card and then a click on
+the GET button (postfix on `ArcanaCardUI.OnClick` calls `Select()` one frame later).
+The speed limit of the game goes from 2x to 5x. The toggle order is 1x, 2x, 3x, 4x, 5x, then 1x.
 
 "Setup" means the main character, the local co-op slots (character and CPU behaviour), the stage, the BGM, and the run modifiers.
 Example setup: 4 characters, all CPU, all `Aggressive`.
@@ -119,6 +122,8 @@ The source layout:
 - `QuickRetryCore.cs`: Harmony patches, buttons, next-stage rule, start of the run.
 - `RunSnapshot.cs`: capture and restore of the run setup.
 - `PauseStageName.cs`: stage name label on the pause page.
+- `GameSpeed.cs`: raises the speed limit to 5x and replaces the toggle order.
+- `ArcanaDoubleClick.cs`: double click on an arcana card confirms it.
 - `FrameScheduler.cs`: runs an action some frames later. The loader entry point ticks it.
 - `ModLog.cs`: log sink that the loader entry point sets.
 - `Interop.cs`: every IL2CPP and Mono difference. Object identity, delegate conversion, type casts, the
@@ -172,6 +177,35 @@ Paths are relative to `reference/decompiled/VampireSurvivors.Runtime/`. Line num
   - `_DoneButton` is a `Selectable`. Its click is a persistent `UnityEvent` listener from the prefab. `RemoveAllListeners()` does not remove it. Replace `onClick` with a new `ButtonClickedEvent` on the clone.
 - `VampireSurvivors/GameStateRecap.cs`: on `RecapPageCompletedSignal`, it fires `RETURN_TO_LANDING` and loads `ScenePreloader`.
 
+### Game speed
+
+- `VampireSurvivors.Framework.Speedup/SpeedupManager.cs`: the speed-up feature of the game. `m_MaxSpeed` is
+  `2f` (line 15) and `c_SpeedMultiplierSpeedupStep` is `0.5f`. `SetSpeedup(float)` (line 117) clamps to
+  `m_MaxSpeed` and writes `Time.timeScale`. `Setup()` (line 42) runs once per run, from `Stage.Start`
+  (`VampireSurvivors.Objects/Stage.cs:532`). `ClearSpeedupManager()` drops the instance at the end of the run,
+  so the limit must be set again in every run.
+- `ToggleSpeedup(InputActionEventData)` (line 76) is the Rewired handler for action 24. Its order is 1x, 1.5x,
+  2x, then back to 1x, so a higher `m_MaxSpeed` alone changes nothing. The handler ignores the press while the
+  player holds Rewired button 26.
+- Three rules block the speed-up: the `RELIC_SPEEDUP` item is not collected, the item is in
+  `PlayerOptionsData.SealedItems`, or `StageData.isSpeedupBanned` is true. Online runs are blocked too.
+  `SetSpeedupBlocked(bool)` is a short block for cutscenes and boss gates.
+- `VampireSurvivors.App.UI/FastForwardButton.cs`: the on-screen button. `FastForward()` (line 92) is the second
+  input path and needs the same order. `CheckTimescale()` (line 72) picks one of three icons: `_icon1` below
+  1.5x, `_icon2` below 2x, `_icon3` from 2x up. `Update()` (line 48) hides all three icons when the run blocks
+  the speed-up. `GM.Core.MainUI.KillsText` is a public `TextMeshProUGUI` and works as a font template.
+
+### Arcana selection
+
+- `VampireSurvivors.UI/ArcanaCardUI.cs`: `OnClick()` (line 300) calls `ISetArcanaInfo.SetInfo(data, type, this)`
+  on every click on an unlocked card that is not already active.
+- `VampireSurvivors.UI/ArcanaMainSelectionPage.cs`: `SetInfo` (line 1557) returns early when the card is already
+  the selected one, so it is not usable for a double click. `Select()` (line 1577) is what the GET button calls;
+  it checks the unlock state itself. `_hasFinishedPopulationAnimation` and `_hasPickedRandom` gate the GET
+  button. The major page, the minor page, and the Darkana page all use this one class.
+- `VampireSurvivors.UI/SurvarotsSelectionPage.cs`: the same shape. Public `Select()` (line 986) and the same two
+  flags.
+
 ### Pause page
 
 - `VampireSurvivors/PausePage.cs`: `OnShowStart` (line 174) builds the page each time the game pauses. `_ResumeButton` (line 72) is a `RectTransform` with a `TextMeshProUGUI` label.
@@ -200,6 +234,12 @@ This design is implemented in `src/VampireSurvivorsUx/`.
 - Next stage order: the stage select list order (`StageData.order`).
 - Next stage BGM: the song panel rule (locked track, else character track, else stage track).
 - Human players: the game keeps the pad on the slot when the pad is still connected. If the game removed the pad, the slot stays empty and the log shows a warning.
+- Speed stops: 1x, 2x, 3x, 4x, 5x. Whole steps, five presses per full cycle. The 1.5x stop of the game is gone.
+- Speed rules: the mod keeps every rule of the game. The Speed-Up relic is still necessary, a banned stage still
+  blocks the speed-up, and online runs still block it. The mod only raises the limit and changes the order.
+- Speed label: the game has one icon for every speed from 2x up. The mod adds the number next to the button from
+  3x, so 3x, 4x, and 5x are not the same picture. The label follows `_icon3`, so every rule that hides the
+  button hides the label too.
 
 ## Test results (PC, 2026-09-10, BepInEx BE 788, build 25016043)
 
