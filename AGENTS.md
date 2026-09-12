@@ -193,7 +193,13 @@ Paths are relative to `reference/decompiled/VampireSurvivors.Runtime/`. Line num
 - `VampireSurvivors.App.UI/FastForwardButton.cs`: the on-screen button. `FastForward()` (line 92) is the second
   input path and needs the same order. `CheckTimescale()` (line 72) picks one of three icons: `_icon1` below
   1.5x, `_icon2` below 2x, `_icon3` from 2x up. `Update()` (line 48) hides all three icons when the run blocks
-  the speed-up. `GM.Core.MainUI.KillsText` is a public `TextMeshProUGUI` and works as a font template.
+  the speed-up.
+- The three icons are children of `Button - Fast Forward`, all 100x100 and stacked at the same place
+  (`anchoredPosition` `(-50, -50)`). The sprites are `fastForward` (one arrow), `fastForwardX2` (two arrows),
+  and `fastForwardX3` (three arrows). The arrows fill about 70 of the 100 units.
+- **Harmony does not patch `SpeedupManager.Setup` on the IL2CPP build.** The postfix never runs, the limit
+  stays at 2x, and every step above 2x is clamped back to 2x. The same patch works on the Mono build. Raise
+  the limit in the toggle path instead, where it works on both.
 
 ### Arcana selection
 
@@ -237,9 +243,11 @@ This design is implemented in `src/VampireSurvivorsUx/`.
 - Speed stops: 1x, 2x, 3x, 4x, 5x. Whole steps, five presses per full cycle. The 1.5x stop of the game is gone.
 - Speed rules: the mod keeps every rule of the game. The Speed-Up relic is still necessary, a banned stage still
   blocks the speed-up, and online runs still block it. The mod only raises the limit and changes the order.
-- Speed label: the game has one icon for every speed from 2x up. The mod adds the number next to the button from
-  3x, so 3x, 4x, and 5x are not the same picture. The label follows `_icon3`, so every rule that hides the
-  button hides the label too.
+- Speed indicator: the game has one icon for every speed from 2x up, so 2x to 5x would look the same. The mod
+  keeps the icons of the game for the first three speeds and adds the missing arrows with the art of the game:
+  4x is the three arrow icon plus the one arrow icon, 5x is the three arrow icon plus the two arrow icon. The
+  extra icon sits 70 units to the right, so the arrows read as one row. It follows `_icon3`, so every rule that
+  hides the button hides it too.
 
 ## Test results (PC, 2026-09-10, BepInEx BE 788, build 25016043)
 
@@ -315,6 +323,48 @@ Facts checked on 2026-09-12 on macOS 26.6.2, Apple M4 Pro, game build `25016043`
 | 5. Pause page stage name | Pass. `Pause page: stage label added. root=View - Paused size=(1920.00, 1200.00)`. |
 | 6. Recap page buttons | Pass. `Done button parent=ButtonContainer layout=HorizontalLayoutGroup`. Three clones added. |
 | 7. Next new, party of 4 | Pass. `EX_MAZERELLA -> TOWERBRIDGE`, BGM `BGM_Bridge`, all 4 slots and `PartySize` restored, `START_GAME` fired. |
+
+## Test results (PC, 2026-09-13, BepInEx BE 788, IL2CPP, build 25016043)
+
+| Test | Result |
+| --- | --- |
+| 1. Arcana double click | Pass. `Arcana double click: confirming on the arcana page.` on the DARKASSO page. |
+| 2. Speed order | Pass. `1x -> 2x -> 3x -> 4x -> 5x`, `limit=5` on every step. |
+| 3. Speed indicator | Pass. 4x shows four arrows, 5x shows five, in one row and at the size of the game. |
+| 4. Log | Pass. No error from `VampireSurvivorsUx`. |
+
+The first build of the speed feature failed here: the postfix on `SpeedupManager.Setup` never ran on IL2CPP,
+so the limit stayed at 2x and the log showed `Speed 2x -> 2x.` The fix raises the limit in the toggle path.
+
+## Local test of the Windows build without the Steam launcher
+
+The Steam launcher refuses to start the game while the same account runs it on another computer. It shows a
+dialog and waits. This starts the same build directly and skips that dialog. The Steam client must run.
+
+```sh
+G="$HOME/.local/share/Steam/steamapps/common/Vampire Survivors"
+S="$HOME/.local/share/Steam"
+R="$S/steamapps/common/SteamLinuxRuntime_4"          # the tool that toolmanifest.vdf asks for
+PT=/usr/share/steam/compatibilitytools.d/proton-cachyos-slr
+cd "$G" && env STEAM_COMPAT_CLIENT_INSTALL_PATH="$S" \
+  STEAM_COMPAT_DATA_PATH="$S/steamapps/compatdata/1794680" \
+  STEAM_COMPAT_INSTALL_PATH="$G" STEAM_COMPAT_APP_ID=1794680 \
+  SteamAppId=1794680 SteamGameId=1794680 STEAM_COMPAT_TOOL_PATHS="$PT:$R" \
+  WINEDLLOVERRIDES="version=n,b" \
+  setsid "$R/_v2-entry-point" --verb=waitforexitandrun -- \
+  "$PT/proton" waitforexitandrun "$G/VampireSurvivors.exe" > /tmp/vs.log 2>&1 &
+```
+
+Read `config_info` and `version` in `steamapps/compatdata/1794680/` for the Proton path, and
+`toolmanifest.vdf` of that Proton for the runtime app ID.
+
+Notes:
+
+- **Do not use `pkill -f VampireSurvivors.exe`.** The pattern matches the shell of the agent, so the shell dies
+  and the rest of the command never runs. Use
+  `ps -eo pid,args --no-headers | awk '/VampireSurvivors\.exe/ && !/zsh|ugrep|awk/ {print $1}' | xargs -r kill`.
+- A mouse click from `cua-driver` does not reach the fast forward button, same as the Confirm button on the
+  character page. A click does reach the arcana cards, quick start, and the landing page.
 
 ## Test plan
 

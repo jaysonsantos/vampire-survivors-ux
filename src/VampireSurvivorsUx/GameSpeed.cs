@@ -4,7 +4,6 @@ using UnityEngine;
 #if MELONLOADER
 // MelonLoader generates the interop assemblies with the Il2Cpp namespace prefix.
 using Il2CppRewired;
-using Il2CppTMPro;
 using Il2CppVampireSurvivors;
 using Il2CppVampireSurvivors.App.UI;
 using Il2CppVampireSurvivors.Data;
@@ -13,7 +12,6 @@ using Il2CppVampireSurvivors.Framework.Speedup;
 #else
 // The BepInEx interop assemblies and the Mono game assemblies have no namespace prefix.
 using Rewired;
-using TMPro;
 using VampireSurvivors;
 using VampireSurvivors.App.UI;
 using VampireSurvivors.Data;
@@ -38,34 +36,6 @@ namespace VampireSurvivorsUx
 
         /// <summary>The game ignores the speed-up button while the player holds Rewired button 26.</summary>
         private const int ModifierButtonId = 26;
-
-        private const string LabelName = "VampireSurvivorsUx_SpeedLabel";
-
-        /// <summary>The game shows an icon for 1x, 1.5x, and 2x. The label starts at 3x.</summary>
-        private const float LabelFromSpeed = 3f;
-
-        // ---------------------------------------------------------------- speed limit
-
-        /// <summary>
-        /// <c>Stage.Start</c> calls <c>Setup</c> once per run. <c>ClearSpeedupManager</c> drops the instance at
-        /// the end of the run, so a new instance starts with a limit of 2x again.
-        /// </summary>
-        [HarmonyPatch(typeof(SpeedupManager), nameof(SpeedupManager.Setup))]
-        private static class SpeedupManager_Setup_Patch
-        {
-            private static void Postfix(SpeedupManager __instance)
-            {
-                try
-                {
-                    Priv.SetMaxSpeed(__instance, MaxSpeed);
-                    ModLog.Info("Speed limit raised to " + MaxSpeed + "x.");
-                }
-                catch (Exception e)
-                {
-                    ModLog.Error("SpeedupManager.Setup postfix failed", e);
-                }
-            }
-        }
 
         // ---------------------------------------------------------------- toggle order
 
@@ -127,9 +97,15 @@ namespace VampireSurvivorsUx
         private static void Advance(SpeedupManager manager)
         {
             if (manager == null) return;
+            // Raise the limit before every step. A postfix on SpeedupManager.Setup looks like the right
+            // place, but Harmony does not patch that method on the IL2CPP build, so the limit stayed at 2x
+            // and every step above 2x was clamped back. ClearSpeedupManager also drops the instance at the
+            // end of a run, so the limit has to be set again anyway.
+            Priv.SetMaxSpeed(manager, MaxSpeed);
             float current = manager.CurrentSpeedMultiplier;
             manager.SetSpeedup(NextStop(current));
-            ModLog.Info("Speed " + current + "x -> " + manager.CurrentSpeedMultiplier + "x.");
+            ModLog.Info("Speed " + current + "x -> " + manager.CurrentSpeedMultiplier + "x. limit="
+                + Priv.MaxSpeed(manager));
         }
 
         /// <summary>The first stop above the current speed. Wraps to the first stop at the top.</summary>
@@ -142,12 +118,14 @@ namespace VampireSurvivorsUx
             return Stops[0];
         }
 
-        // ---------------------------------------------------------------- speed label
+        // ---------------------------------------------------------------- speed arrows
 
         /// <summary>
-        /// The game has three icons for the speed button and the third one covers everything from 2x up.
-        /// This adds the number next to the button from 3x, so 3x, 4x, and 5x are not the same picture.
-        /// The label follows the third icon, so every rule that hides the button hides the label too.
+        /// The button has three stacked icons: one arrow (<c>fastForward</c>), two arrows
+        /// (<c>fastForwardX2</c>), and three arrows (<c>fastForwardX3</c>). The game shows the third one for
+        /// every speed from 2x up, so 4x and 5x look the same as 3x. This adds one or two more arrows to the
+        /// right of the button. The first three speeds keep the icons of the game.
+        /// The arrows follow the third icon, so every rule that hides the button hides them too.
         /// </summary>
         [HarmonyPatch(typeof(FastForwardButton), "Update")]
         private static class FastForwardButton_Update_Patch
@@ -156,7 +134,7 @@ namespace VampireSurvivorsUx
             {
                 try
                 {
-                    UpdateLabel(__instance);
+                    UpdateArrows(__instance);
                 }
                 catch (Exception e)
                 {
@@ -165,69 +143,74 @@ namespace VampireSurvivorsUx
             }
         }
 
-        private static TextMeshProUGUI _label;
+        private const string ArrowName = "VampireSurvivorsUx_SpeedArrows";
 
-        private static void UpdateLabel(FastForwardButton button)
+        /// <summary>The arrows fill about 70 of the 100 units of the icon, so the extra group sits 70 to the right.</summary>
+        private const float ExtraOffsetX = 70f;
+
+        private static GameObject _extra;
+        private static UnityEngine.UI.Image _extraImage;
+
+        /// <summary>
+        /// Adds the missing arrows with the art of the game and at its size. 4x is the three arrow icon plus
+        /// the one arrow icon. 5x is the three arrow icon plus the two arrow icon.
+        /// </summary>
+        private static void UpdateArrows(FastForwardButton button)
         {
-            GameObject icon = Priv.FastForwardIcon3(button);
+            GameObject icon3 = Priv.FastForwardIcon3(button);
+            bool iconsVisible = icon3 != null && icon3.activeInHierarchy;
             float speed = SpeedupManager.Instance.CurrentSpeedMultiplier;
-            bool show = icon != null && icon.activeInHierarchy && speed >= LabelFromSpeed;
 
-            if (_label == null)
+            // The button is rebuilt with every run, so drop the object of the previous run.
+            if (_extra == null) _extraImage = null;
+
+            int extraArrows = 0;
+            if (iconsVisible)
             {
-                if (!show) return;
-                _label = GetOrCreateLabel(button);
-                if (_label == null) return;
+                if (speed >= 5f) extraArrows = 2;
+                else if (speed >= 4f) extraArrows = 1;
             }
-            if (_label.gameObject.activeSelf != show) _label.gameObject.SetActive(show);
-            if (!show) return;
-            string text = "x" + Mathf.RoundToInt(speed);
-            if (_label.text != text) _label.text = text;
+
+            if (extraArrows == 0)
+            {
+                if (_extra != null && _extra.activeSelf) _extra.SetActive(false);
+                return;
+            }
+
+            if (_extra == null && !CreateExtra(button)) return;
+
+            GameObject source = extraArrows == 2 ? Priv.FastForwardIcon2(button) : Priv.FastForwardIcon1(button);
+            var sourceImage = source != null ? source.GetComponent<UnityEngine.UI.Image>() : null;
+            if (sourceImage != null && _extraImage != null && _extraImage.sprite != sourceImage.sprite)
+            {
+                _extraImage.sprite = sourceImage.sprite;
+            }
+            if (!_extra.activeSelf) _extra.SetActive(true);
         }
 
-        private static TextMeshProUGUI GetOrCreateLabel(FastForwardButton button)
+        private static bool CreateExtra(FastForwardButton button)
         {
-            Transform root = button.transform;
-            Transform existing = root.Find(LabelName);
-            if (existing != null) return existing.GetComponent<TextMeshProUGUI>();
-
-            RectTransform buttonRect = button.GetComponent<RectTransform>();
-            float height = buttonRect != null ? buttonRect.rect.height : 64f;
-
-            var go = new GameObject(LabelName);
-            go.layer = root.gameObject.layer;
-            TextMeshProUGUI text = go.AddComponent<TextMeshProUGUI>();
-            RectTransform rect = text.rectTransform;
-            rect.SetParent(root, false);
-            rect.anchorMin = new Vector2(0.5f, 0f);
-            rect.anchorMax = new Vector2(0.5f, 0f);
-            rect.pivot = new Vector2(0.5f, 1f);
-            rect.sizeDelta = new Vector2(height * 2f, height * 0.6f);
-            rect.anchoredPosition = Vector2.zero;
-
-            // Copy the font and the outline material from the kill counter of the HUD.
-            TextMeshProUGUI template = TemplateText();
-            if (template != null)
+            GameObject template = Priv.FastForwardIcon1(button);
+            if (template == null)
             {
-                text.font = template.font;
-                text.fontSharedMaterial = template.fontSharedMaterial;
-                text.color = template.color;
+                ModLog.Warn("Speed arrows: the one arrow icon is missing.");
+                return false;
             }
-            else ModLog.Warn("Speed label: no HUD text found. The label uses the default font.");
-            text.enableAutoSizing = false;
-            text.fontSize = height * 0.5f;
-            text.alignment = TextAlignmentOptions.Top;
-            text.overflowMode = TextOverflowModes.Overflow;
-            text.raycastTarget = false;
-
-            ModLog.Info("Speed label added to " + root.name + ". buttonHeight=" + height);
-            return text;
-        }
-
-        private static TextMeshProUGUI TemplateText()
-        {
-            GameManager gm = GM.Core;
-            return gm != null && gm.MainUI != null ? gm.MainUI.KillsText : null;
+            _extra = UnityEngine.Object.Instantiate(template, button.transform, false);
+            _extra.name = ArrowName;
+            _extraImage = _extra.GetComponent<UnityEngine.UI.Image>();
+            var rect = _extra.GetComponent<RectTransform>();
+            var source = template.GetComponent<RectTransform>();
+            if (rect != null && source != null)
+            {
+                Vector2 pos = source.anchoredPosition;
+                pos.x += ExtraOffsetX;
+                rect.anchoredPosition = pos;
+                rect.localScale = Vector3.one;
+            }
+            _extra.SetActive(false);
+            ModLog.Info("Speed arrows: extra icon added at x offset " + ExtraOffsetX + ".");
+            return true;
         }
     }
 }
