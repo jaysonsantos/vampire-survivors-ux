@@ -14,8 +14,14 @@ The mod also adds double click to the menus:
 
 - On the character page, a double click on a character selects and confirms it.
 - In the party size popup and in the CPU type popup, a double click on an option confirms it.
+- On an arcana page, a double click on a card selects and confirms it. No second click on **GET** is necessary.
 
 When the game is paused, the mod shows the name of the current stage at the top of the screen.
+
+The speed limit of the game goes from 2x to 5x. The speed button steps through 1x, 2x, 3x, 4x, 5x, and back to
+1x. The rules of the game do not change: the speed-up still needs the Speed-Up relic, and it stays off on stages
+that ban it and in online runs. From 3x the mod shows the number next to the button, because the game has one
+icon for every speed from 2x up.
 
 The buttons do not appear in online runs and in adventures. The mod does not change game data or balance. The game still gives rewards and saves before a new run starts.
 

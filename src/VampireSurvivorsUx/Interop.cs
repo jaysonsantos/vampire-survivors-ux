@@ -12,13 +12,17 @@ using System.Reflection;
 #if MELONLOADER
 // MelonLoader generates the interop assemblies with the Il2Cpp namespace prefix.
 using Il2CppVampireSurvivors;
+using Il2CppVampireSurvivors.App.UI;
 using Il2CppVampireSurvivors.Framework;
+using Il2CppVampireSurvivors.Framework.Speedup;
 using Il2CppVampireSurvivors.Objects;
 using Il2CppVampireSurvivors.UI;
 #else
 // The BepInEx interop assemblies and the Mono game assemblies have no namespace prefix.
 using VampireSurvivors;
+using VampireSurvivors.App.UI;
 using VampireSurvivors.Framework;
+using VampireSurvivors.Framework.Speedup;
 using VampireSurvivors.Objects;
 using VampireSurvivors.UI;
 #endif
@@ -82,6 +86,16 @@ namespace VampireSurvivorsUx
         public static int SelectedIndex(LargeMultiOptionPopup popup) => popup._selectedIndex;
 
         public static RectTransform ResumeButton(PausePage page) => page._ResumeButton;
+
+        public static GameObject FastForwardIcon3(FastForwardButton button) => button._icon3;
+
+        public static void SetMaxSpeed(SpeedupManager manager, float value) => manager.m_MaxSpeed = value;
+
+        public static bool IsArcanaPageReady(ArcanaMainSelectionPage page)
+            => page._hasFinishedPopulationAnimation && !page._hasPickedRandom;
+
+        public static bool IsSurvarotsPageReady(SurvarotsSelectionPage page)
+            => page._hasFinishedPopulationAnimation && !page._hasPickedRandom;
 #else
         public static Selectable DoneButton(RecapPage page) => Read<Selectable>(page, "_DoneButton");
 
@@ -94,6 +108,39 @@ namespace VampireSurvivorsUx
         }
 
         public static RectTransform ResumeButton(PausePage page) => Read<RectTransform>(page, "_ResumeButton");
+
+        public static GameObject FastForwardIcon3(FastForwardButton button) => Read<GameObject>(button, "_icon3");
+
+        public static void SetMaxSpeed(SpeedupManager manager, float value)
+        {
+            FieldInfo field = Find(manager.GetType(), "m_MaxSpeed");
+            if (field == null)
+            {
+                ModLog.Warn("Field m_MaxSpeed not found on SpeedupManager.");
+                return;
+            }
+            field.SetValue(manager, value);
+        }
+
+        public static bool IsArcanaPageReady(ArcanaMainSelectionPage page) => IsPageReady(page);
+
+        public static bool IsSurvarotsPageReady(SurvarotsSelectionPage page) => IsPageReady(page);
+
+        /// <summary>Both arcana pages use the same two flags to gate the confirm button.</summary>
+        private static bool IsPageReady(object page)
+            => ReadBool(page, "_hasFinishedPopulationAnimation") && !ReadBool(page, "_hasPickedRandom");
+
+        private static bool ReadBool(object target, string name)
+        {
+            if (target == null) return false;
+            FieldInfo field = Find(target.GetType(), name);
+            if (field == null)
+            {
+                ModLog.Warn("Field " + name + " not found on " + target.GetType().Name + ".");
+                return false;
+            }
+            return (bool)field.GetValue(target);
+        }
 
         private static T Read<T>(object target, string name) where T : class
         {
