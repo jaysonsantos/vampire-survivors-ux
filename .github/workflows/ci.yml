@@ -27,6 +27,31 @@ jobs:
             exit 1
           fi
           echo "OK"
-      - name: Check that the C# project restores
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+      - name: Check the loader matrix in the C# project
         run: |
-          grep -q '<TargetFramework>net6.0</TargetFramework>' src/VampireSurvivorsUx/VampireSurvivorsUx.csproj
+          set -eu
+          P=src/VampireSurvivorsUx/VampireSurvivorsUx.csproj
+          fail=0
+          # $1 loader, $2 expected TargetFramework, $3 expected compile symbols
+          check() {
+            tfm=$(dotnet msbuild "$P" -nologo -p:Loader="$1" -getProperty:TargetFramework)
+            syms=$(dotnet msbuild "$P" -nologo -p:Loader="$1" -getProperty:DefineConstants)
+            echo "Loader=$1 TargetFramework=$tfm DefineConstants=$syms"
+            if [ "$tfm" != "$2" ]; then
+              echo "  TargetFramework must be $2"
+              fail=1
+            fi
+            for s in $3; do
+              if ! printf '%s' "$syms" | grep -q "$s"; then
+                echo "  DefineConstants must contain $s"
+                fail=1
+              fi
+            done
+          }
+          check MelonLoader net6.0 'MELONLOADER IL2CPP'
+          check BepInEx net6.0 'BEPINEX IL2CPP'
+          check BepInExMono netstandard2.1 'BEPINEX_MONO MONO'
+          exit "$fail"

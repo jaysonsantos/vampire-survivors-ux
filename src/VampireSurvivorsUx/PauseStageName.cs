@@ -1,16 +1,7 @@
 using System;
 using HarmonyLib;
 using UnityEngine;
-#if BEPINEX
-// BepInEx generates the interop assemblies without a namespace prefix.
-using I2.Loc;
-using TMPro;
-using VampireSurvivors;
-using VampireSurvivors.Data;
-using VampireSurvivors.Data.Stage;
-using VampireSurvivors.Framework;
-using VampireSurvivors.Objects;
-#else
+#if MELONLOADER
 // MelonLoader generates the interop assemblies with the Il2Cpp namespace prefix.
 using Il2CppI2.Loc;
 using Il2CppTMPro;
@@ -19,6 +10,15 @@ using Il2CppVampireSurvivors.Data;
 using Il2CppVampireSurvivors.Data.Stage;
 using Il2CppVampireSurvivors.Framework;
 using Il2CppVampireSurvivors.Objects;
+#else
+// The BepInEx interop assemblies and the Mono game assemblies have no namespace prefix.
+using I2.Loc;
+using TMPro;
+using VampireSurvivors;
+using VampireSurvivors.Data;
+using VampireSurvivors.Data.Stage;
+using VampireSurvivors.Framework;
+using VampireSurvivors.Objects;
 #endif
 
 namespace VampireSurvivorsUx
@@ -74,7 +74,7 @@ namespace VampireSurvivorsUx
             if (existing != null) return existing.GetComponent<TextMeshProUGUI>();
 
             // Copy the font and the material (outline) from the Resume button label.
-            RectTransform resume = page._ResumeButton;
+            RectTransform resume = Priv.ResumeButton(page);
             TextMeshProUGUI template = resume != null ? resume.GetComponentInChildren<TextMeshProUGUI>(true) : null;
 
             var go = new GameObject(LabelName);

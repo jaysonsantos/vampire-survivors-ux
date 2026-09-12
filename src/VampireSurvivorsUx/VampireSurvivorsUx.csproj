@@ -2,12 +2,12 @@
 
   <!--
     Build:   dotnet build -c Release                          (MelonLoader, default)
-             dotnet build -c Release -p:Loader=BepInEx        (BepInEx IL2CPP)
-    Paths:   -p:GamePath=...  -p:Il2CppAssembliesPath=...  -p:LoaderLibPath=...  -p:CopyToMods=false
+             dotnet build -c Release -p:Loader=BepInEx        (BepInEx IL2CPP, Windows build)
+             dotnet build -c Release -p:Loader=BepInExMono    (BepInEx 5 Mono, macOS and Linux builds)
+    Paths:   -p:GamePath=...  -p:GameAsmPath=...  -p:LoaderLibPath=...  -p:CopyToMods=false
   -->
 
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
@@ -20,56 +20,80 @@
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
 
     <Loader Condition="'$(Loader)' == ''">MelonLoader</Loader>
-    <GamePath Condition="'$(GamePath)' == ''">$(HOME)/.local/share/Steam/steamapps/common/Vampire Survivors</GamePath>
     <CopyToMods Condition="'$(CopyToMods)' == ''">true</CopyToMods>
+
+    <!-- One folder per loader. The loaders are not interchangeable, so a shared folder would hide a stale DLL. -->
+    <OutputPath>bin/$(Configuration)/$(Loader)/</OutputPath>
+
+    <!-- The Mono game assemblies target netstandard2.1. The IL2CPP interop assemblies target net6.0. -->
+    <TargetFramework Condition="'$(Loader)' == 'BepInExMono'">netstandard2.1</TargetFramework>
+    <TargetFramework Condition="'$(TargetFramework)' == ''">net6.0</TargetFramework>
+
+    <!-- Back-compatible name for the game assembly folder. -->
+    <GameAsmPath Condition="'$(GameAsmPath)' == '' And '$(Il2CppAssembliesPath)' != ''">$(Il2CppAssembliesPath)</GameAsmPath>
   </PropertyGroup>
 
-  <!-- MelonLoader layout -->
+  <!-- MelonLoader layout (IL2CPP, Windows build) -->
   <PropertyGroup Condition="'$(Loader)' == 'MelonLoader'">
-    <DefineConstants>$(DefineConstants);MELONLOADER</DefineConstants>
+    <DefineConstants>$(DefineConstants);MELONLOADER;IL2CPP</DefineConstants>
+    <GamePath Condition="'$(GamePath)' == ''">$(HOME)/.local/share/Steam/steamapps/common/Vampire Survivors</GamePath>
     <LoaderLibPath Condition="'$(LoaderLibPath)' == ''">$(GamePath)/MelonLoader/net6</LoaderLibPath>
-    <Il2CppAssembliesPath Condition="'$(Il2CppAssembliesPath)' == ''">$(GamePath)/MelonLoader/Il2CppAssemblies</Il2CppAssembliesPath>
+    <GameAsmPath Condition="'$(GameAsmPath)' == ''">$(GamePath)/MelonLoader/Il2CppAssemblies</GameAsmPath>
     <ModsPath Condition="'$(ModsPath)' == ''">$(GamePath)/Mods</ModsPath>
   </PropertyGroup>
 
-  <!-- BepInEx IL2CPP layout -->
+  <!-- BepInEx IL2CPP layout (Windows build under Proton) -->
   <PropertyGroup Condition="'$(Loader)' == 'BepInEx'">
-    <DefineConstants>$(DefineConstants);BEPINEX</DefineConstants>
+    <DefineConstants>$(DefineConstants);BEPINEX;IL2CPP</DefineConstants>
+    <GamePath Condition="'$(GamePath)' == ''">$(HOME)/.local/share/Steam/steamapps/common/Vampire Survivors</GamePath>
     <LoaderLibPath Condition="'$(LoaderLibPath)' == ''">$(GamePath)/BepInEx/core</LoaderLibPath>
-    <Il2CppAssembliesPath Condition="'$(Il2CppAssembliesPath)' == ''">$(GamePath)/BepInEx/interop</Il2CppAssembliesPath>
+    <GameAsmPath Condition="'$(GameAsmPath)' == ''">$(GamePath)/BepInEx/interop</GameAsmPath>
     <ModsPath Condition="'$(ModsPath)' == ''">$(GamePath)/BepInEx/plugins</ModsPath>
   </PropertyGroup>
 
-  <!-- MelonLoader prefixes the interop file names with Il2Cpp. BepInEx does not. Pick the file that exists. -->
+  <!-- BepInEx 5 Mono layout (macOS native build). The game assemblies live in the app bundle. -->
+  <PropertyGroup Condition="'$(Loader)' == 'BepInExMono'">
+    <DefineConstants>$(DefineConstants);BEPINEX_MONO;MONO</DefineConstants>
+    <GamePath Condition="'$(GamePath)' == ''">$(HOME)/Library/Application Support/Steam/steamapps/common/Vampire Survivors</GamePath>
+    <LoaderLibPath Condition="'$(LoaderLibPath)' == ''">$(GamePath)/BepInEx/core</LoaderLibPath>
+    <GameAsmPath Condition="'$(GameAsmPath)' == ''">$(GamePath)/Vampire_Survivors.app/Contents/Resources/Data/Managed</GameAsmPath>
+    <ModsPath Condition="'$(ModsPath)' == ''">$(GamePath)/BepInEx/plugins</ModsPath>
+  </PropertyGroup>
+
+  <!-- MelonLoader prefixes the interop file names with Il2Cpp. BepInEx and Mono do not. Pick the file that exists. -->
   <PropertyGroup>
-    <VsRuntimeDll Condition="Exists('$(Il2CppAssembliesPath)/Il2CppVampireSurvivors.Runtime.dll')">$(Il2CppAssembliesPath)/Il2CppVampireSurvivors.Runtime.dll</VsRuntimeDll>
-    <VsRuntimeDll Condition="'$(VsRuntimeDll)' == ''">$(Il2CppAssembliesPath)/VampireSurvivors.Runtime.dll</VsRuntimeDll>
-    <LocalizationDll Condition="Exists('$(Il2CppAssembliesPath)/Il2Cppl2localization.dll')">$(Il2CppAssembliesPath)/Il2Cppl2localization.dll</LocalizationDll>
-    <LocalizationDll Condition="'$(LocalizationDll)' == ''">$(Il2CppAssembliesPath)/l2localization.dll</LocalizationDll>
-    <PauseSystemDll Condition="Exists('$(Il2CppAssembliesPath)/Il2CppPauseSystem.dll')">$(Il2CppAssembliesPath)/Il2CppPauseSystem.dll</PauseSystemDll>
-    <PauseSystemDll Condition="'$(PauseSystemDll)' == ''">$(Il2CppAssembliesPath)/PauseSystem.dll</PauseSystemDll>
-    <RewiredCoreDll Condition="Exists('$(Il2CppAssembliesPath)/Il2CppRewired_Core.dll')">$(Il2CppAssembliesPath)/Il2CppRewired_Core.dll</RewiredCoreDll>
-    <RewiredCoreDll Condition="'$(RewiredCoreDll)' == ''">$(Il2CppAssembliesPath)/Rewired_Core.dll</RewiredCoreDll>
+    <VsRuntimeDll Condition="Exists('$(GameAsmPath)/Il2CppVampireSurvivors.Runtime.dll')">$(GameAsmPath)/Il2CppVampireSurvivors.Runtime.dll</VsRuntimeDll>
+    <VsRuntimeDll Condition="'$(VsRuntimeDll)' == ''">$(GameAsmPath)/VampireSurvivors.Runtime.dll</VsRuntimeDll>
+    <LocalizationDll Condition="Exists('$(GameAsmPath)/Il2Cppl2localization.dll')">$(GameAsmPath)/Il2Cppl2localization.dll</LocalizationDll>
+    <LocalizationDll Condition="'$(LocalizationDll)' == ''">$(GameAsmPath)/l2localization.dll</LocalizationDll>
+    <PauseSystemDll Condition="Exists('$(GameAsmPath)/Il2CppPauseSystem.dll')">$(GameAsmPath)/Il2CppPauseSystem.dll</PauseSystemDll>
+    <PauseSystemDll Condition="'$(PauseSystemDll)' == ''">$(GameAsmPath)/PauseSystem.dll</PauseSystemDll>
+    <RewiredCoreDll Condition="Exists('$(GameAsmPath)/Il2CppRewired_Core.dll')">$(GameAsmPath)/Il2CppRewired_Core.dll</RewiredCoreDll>
+    <RewiredCoreDll Condition="'$(RewiredCoreDll)' == ''">$(GameAsmPath)/Rewired_Core.dll</RewiredCoreDll>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Include="*.cs" />
     <Compile Include="Loader/MelonEntry.cs" Condition="'$(Loader)' == 'MelonLoader'" />
     <Compile Include="Loader/BepInExEntry.cs" Condition="'$(Loader)' == 'BepInEx'" />
+    <Compile Include="Loader/BepInExMonoEntry.cs" Condition="'$(Loader)' == 'BepInExMono'" />
   </ItemGroup>
 
   <ItemGroup>
     <Reference Include="0Harmony"><HintPath>$(LoaderLibPath)/0Harmony.dll</HintPath><Private>false</Private></Reference>
-    <Reference Include="Il2CppInterop.Runtime"><HintPath>$(LoaderLibPath)/Il2CppInterop.Runtime.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="VampireSurvivors.Runtime"><HintPath>$(VsRuntimeDll)</HintPath><Private>false</Private></Reference>
     <Reference Include="l2localization"><HintPath>$(LocalizationDll)</HintPath><Private>false</Private></Reference>
     <Reference Include="PauseSystem"><HintPath>$(PauseSystemDll)</HintPath><Private>false</Private></Reference>
     <Reference Include="Rewired_Core"><HintPath>$(RewiredCoreDll)</HintPath><Private>false</Private></Reference>
-    <Reference Include="Il2Cppmscorlib"><HintPath>$(Il2CppAssembliesPath)/Il2Cppmscorlib.dll</HintPath><Private>false</Private></Reference>
-    <Reference Include="UnityEngine.CoreModule"><HintPath>$(Il2CppAssembliesPath)/UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
-    <Reference Include="UnityEngine.InputLegacyModule"><HintPath>$(Il2CppAssembliesPath)/UnityEngine.InputLegacyModule.dll</HintPath><Private>false</Private></Reference>
-    <Reference Include="UnityEngine.UI"><HintPath>$(Il2CppAssembliesPath)/UnityEngine.UI.dll</HintPath><Private>false</Private></Reference>
-    <Reference Include="Unity.TextMeshPro"><HintPath>$(Il2CppAssembliesPath)/Unity.TextMeshPro.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(GameAsmPath)/UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.InputLegacyModule"><HintPath>$(GameAsmPath)/UnityEngine.InputLegacyModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.UI"><HintPath>$(GameAsmPath)/UnityEngine.UI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Unity.TextMeshPro"><HintPath>$(GameAsmPath)/Unity.TextMeshPro.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(Loader)' == 'MelonLoader' Or '$(Loader)' == 'BepInEx'">
+    <Reference Include="Il2CppInterop.Runtime"><HintPath>$(LoaderLibPath)/Il2CppInterop.Runtime.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Il2Cppmscorlib"><HintPath>$(GameAsmPath)/Il2Cppmscorlib.dll</HintPath><Private>false</Private></Reference>
   </ItemGroup>
 
   <ItemGroup Condition="'$(Loader)' == 'MelonLoader'">
@@ -80,6 +104,12 @@
     <Reference Include="BepInEx.Core"><HintPath>$(LoaderLibPath)/BepInEx.Core.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="BepInEx.Unity.IL2CPP"><HintPath>$(LoaderLibPath)/BepInEx.Unity.IL2CPP.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="BepInEx.Unity.Common"><HintPath>$(LoaderLibPath)/BepInEx.Unity.Common.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+
+  <!-- BepInEx 5 keeps BaseUnityPlugin in BepInEx.dll. It names the old UnityEngine facade, so reference it too. -->
+  <ItemGroup Condition="'$(Loader)' == 'BepInExMono'">
+    <Reference Include="BepInEx"><HintPath>$(LoaderLibPath)/BepInEx.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine"><HintPath>$(GameAsmPath)/UnityEngine.dll</HintPath><Private>false</Private></Reference>
   </ItemGroup>
 
   <Target Name="CopyToGameMods" AfterTargets="Build" Condition="'$(CopyToMods)' == 'true' And Exists('$(GamePath)')">

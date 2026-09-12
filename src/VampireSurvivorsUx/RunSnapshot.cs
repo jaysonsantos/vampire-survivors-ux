@@ -1,19 +1,15 @@
 using System;
-using System.Runtime.InteropServices;
 using System.Text;
-using Il2CppInterop.Runtime;
-using Il2CppInterop.Runtime.InteropTypes;
-using Il2CppSystem.Collections.Generic;
-#if BEPINEX
-using VampireSurvivors.Data;
-using VampireSurvivors.Framework;
-using VampireSurvivors.Objects;
-using VampireSurvivors.Objects.Algorithm;
-#else
+#if MELONLOADER
 using Il2CppVampireSurvivors.Data;
 using Il2CppVampireSurvivors.Framework;
 using Il2CppVampireSurvivors.Objects;
 using Il2CppVampireSurvivors.Objects.Algorithm;
+#else
+using VampireSurvivors.Data;
+using VampireSurvivors.Framework;
+using VampireSurvivors.Objects;
+using VampireSurvivors.Objects.Algorithm;
 #endif
 
 namespace VampireSurvivorsUx
@@ -83,7 +79,8 @@ namespace VampireSurvivorsUx
 
             if (multiplayer != null)
             {
-                List<CoopSlotData> slots = multiplayer.GetLocalPlayerSlots();
+                // The list type differs between the runtimes, so bind it with var.
+                var slots = multiplayer.GetLocalPlayerSlots();
                 int count = slots != null ? slots.Count : 0;
                 s.Slots = new SlotSnapshot[count];
                 for (int i = 0; i < count; i++)
@@ -126,7 +123,7 @@ namespace VampireSurvivorsUx
             c.SelectedBGMSave = SelectedBGMSave;
 
             if (multiplayer == null) return;
-            List<CoopSlotData> slots = multiplayer.GetLocalPlayerSlots();
+            var slots = multiplayer.GetLocalPlayerSlots();
             int count = Math.Min(slots != null ? slots.Count : 0, Slots.Length);
             for (int i = 0; i < count; i++)
             {
@@ -172,64 +169,6 @@ namespace VampireSurvivorsUx
             }
             sb.Append(']');
             return sb.ToString();
-        }
-    }
-
-    /// <summary>
-    /// Raw access to <c>MultiplayerManager.PartySize</c> (<c>int?</c>).
-    /// IL2CPP boxes an empty <c>Nullable</c> as null, so the generated getter throws. This reads the struct bytes in place.
-    /// The interop field offsets of a value type include the 16 byte object header, so subtract it.
-    /// </summary>
-    internal static class PartySizeField
-    {
-        private static bool _ready;
-        private static int _baseOffset;
-        private static int _hasValueOffset;
-        private static int _valueOffset;
-
-        private static bool Init()
-        {
-            if (_ready) return true;
-            try
-            {
-                IntPtr managerClass = Il2CppClassPointerStore<MultiplayerManager>.NativeClassPtr;
-                IntPtr nullableClass = Il2CppClassPointerStore<Il2CppSystem.Nullable<int>>.NativeClassPtr;
-                int header = 2 * IntPtr.Size;
-                _baseOffset = (int)IL2CPP.il2cpp_field_get_offset(IL2CPP.GetIl2CppField(managerClass, "PartySize"));
-                _hasValueOffset = (int)IL2CPP.il2cpp_field_get_offset(IL2CPP.GetIl2CppField(nullableClass, "hasValue")) - header;
-                _valueOffset = (int)IL2CPP.il2cpp_field_get_offset(IL2CPP.GetIl2CppField(nullableClass, "value")) - header;
-                if (_baseOffset <= 0 || _hasValueOffset < 0 || _valueOffset < 0 || _hasValueOffset == _valueOffset)
-                {
-                    ModLog.Warn("PartySize offsets look wrong: base=" + _baseOffset + " hasValue=" + _hasValueOffset + " value=" + _valueOffset);
-                    return false;
-                }
-                ModLog.Info("PartySize offsets: base=" + _baseOffset + " hasValue=" + _hasValueOffset + " value=" + _valueOffset);
-                _ready = true;
-                return true;
-            }
-            catch (Exception e)
-            {
-                ModLog.Error("PartySize offset lookup failed", e);
-                return false;
-            }
-        }
-
-        public static bool TryRead(MultiplayerManager manager, out int size)
-        {
-            size = 0;
-            if (!Init()) return false;
-            IntPtr obj = IL2CPP.Il2CppObjectBaseToPtrNotNull(manager);
-            bool hasValue = Marshal.ReadByte(obj, _baseOffset + _hasValueOffset) != 0;
-            size = Marshal.ReadInt32(obj, _baseOffset + _valueOffset);
-            return hasValue;
-        }
-
-        public static void Write(MultiplayerManager manager, int size)
-        {
-            if (!Init()) return;
-            IntPtr obj = IL2CPP.Il2CppObjectBaseToPtrNotNull(manager);
-            Marshal.WriteInt32(obj, _baseOffset + _valueOffset, size);
-            Marshal.WriteByte(obj, _baseOffset + _hasValueOffset, 1);
         }
     }
 }
