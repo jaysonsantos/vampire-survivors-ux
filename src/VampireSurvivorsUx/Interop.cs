@@ -87,9 +87,15 @@ namespace VampireSurvivorsUx
 
         public static RectTransform ResumeButton(PausePage page) => page._ResumeButton;
 
+        public static GameObject FastForwardIcon1(FastForwardButton button) => button._icon1;
+
+        public static GameObject FastForwardIcon2(FastForwardButton button) => button._icon2;
+
         public static GameObject FastForwardIcon3(FastForwardButton button) => button._icon3;
 
         public static void SetMaxSpeed(SpeedupManager manager, float value) => manager.m_MaxSpeed = value;
+
+        public static float MaxSpeed(SpeedupManager manager) => manager.m_MaxSpeed;
 
         public static bool IsArcanaPageReady(ArcanaMainSelectionPage page)
             => page._hasFinishedPopulationAnimation && !page._hasPickedRandom;
@@ -109,6 +115,10 @@ namespace VampireSurvivorsUx
 
         public static RectTransform ResumeButton(PausePage page) => Read<RectTransform>(page, "_ResumeButton");
 
+        public static GameObject FastForwardIcon1(FastForwardButton button) => Read<GameObject>(button, "_icon1");
+
+        public static GameObject FastForwardIcon2(FastForwardButton button) => Read<GameObject>(button, "_icon2");
+
         public static GameObject FastForwardIcon3(FastForwardButton button) => Read<GameObject>(button, "_icon3");
 
         public static void SetMaxSpeed(SpeedupManager manager, float value)
@@ -120,6 +130,12 @@ namespace VampireSurvivorsUx
                 return;
             }
             field.SetValue(manager, value);
+        }
+
+        public static float MaxSpeed(SpeedupManager manager)
+        {
+            FieldInfo field = Find(manager.GetType(), "m_MaxSpeed");
+            return field != null ? (float)field.GetValue(manager) : -1f;
         }
 
         public static bool IsArcanaPageReady(ArcanaMainSelectionPage page) => IsPageReady(page);
