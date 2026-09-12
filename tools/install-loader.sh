@@ -38,20 +38,36 @@ if [ "$1" = bepinex-macos ]; then
   fi
   [ -f "$ZIP" ] || curl -sSL -o "$ZIP" "$URL"
   unzip -o -q "$ZIP" -d "$GAME"
-  chmod +x "$GAME/run_bepinex.sh"
-  xattr -cr "$GAME/libdoorstop.dylib" "$GAME/run_bepinex.sh" "$GAME/BepInEx" 2>/dev/null || true
   mkdir -p "$GAME/BepInEx/plugins"
 
+  SH="$GAME/run_bepinex.sh"
+  # BSD sed and GNU sed disagree on the argument of -i, so write to a temp file.
+  edit() {
+    sed "$1" "$SH" > "$SH.new" && mv "$SH.new" "$SH"
+  }
   # The loader needs the x86_64 slice. MonoMod in BepInEx 5 cannot detour arm64 code, so a native arm64
-  # start fails in the preloader with a null DetourHelper.Native. Rosetta 2 must be installed.
-  perl -pi -e 's/^    export ARCHPREFERENCE="arm64,x86_64"$/    export ARCHPREFERENCE="x86_64,arm64"/' "$GAME/run_bepinex.sh"
-  perl -pi -e 's{^    exec arch -e DYLD_INSERT_LIBRARIES=}{    exec arch -x86_64 -e DYLD_LIBRARY_PATH="\$\{DYLD_LIBRARY_PATH\}" -e DYLD_INSERT_LIBRARIES=}' "$GAME/run_bepinex.sh"
-  perl -pi -e 's/^executable_name=""$/executable_name="Vampire_Survivors.app"/' "$GAME/run_bepinex.sh"
-  grep -q 'exec arch -x86_64' "$GAME/run_bepinex.sh" || { echo "Failed to patch run_bepinex.sh for x86_64." >&2; exit 1; }
+  # start fails in the preloader with a null DetourHelper.Runtime. Rosetta 2 must be installed.
+  edit 's|^    export ARCHPREFERENCE="arm64,x86_64"$|    export ARCHPREFERENCE="x86_64,arm64"|'
+  # arch drops the DYLD variables, so run_bepinex.sh must pass them again. ${DYLD_LIBRARY_PATH} stays
+  # literal here, because run_bepinex.sh expands it, not this script.
+  # shellcheck disable=SC2016
+  edit 's|^    exec arch -e DYLD_INSERT_LIBRARIES=|    exec arch -x86_64 -e DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH}" -e DYLD_INSERT_LIBRARIES=|'
+  edit 's|^executable_name=""$|executable_name="Vampire_Survivors.app"|'
+  chmod +x "$SH"
+
+  for marker in 'exec arch -x86_64' 'ARCHPREFERENCE="x86_64,arm64"' 'executable_name="Vampire_Survivors.app"'; do
+    grep -q "$marker" "$SH" || { echo "Failed to patch run_bepinex.sh: $marker is missing." >&2; exit 1; }
+  done
+
+  # xattr is part of macOS and is not in the dev shell. The quarantine flag is only set on a download
+  # through a browser, so skip this step when the command is absent.
+  if command -v xattr > /dev/null; then
+    xattr -cr "$GAME/libdoorstop.dylib" "$SH" "$GAME/BepInEx" 2>/dev/null || true
+  fi
 
   echo "Installed BepInEx 5 (Mono) into: $GAME"
   echo "Steam launch option:"
-  echo "  \"$GAME/run_bepinex.sh\" %command%"
+  echo "  \"$SH\" %command%"
   exit 0
 fi
 

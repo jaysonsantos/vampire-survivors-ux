@@ -95,7 +95,9 @@ Stop here if no loader loads. Report the log to the user.
 
 The project is `src/VampireSurvivorsUx/VampireSurvivorsUx.csproj`. It supports three loaders with the MSBuild
 property `Loader`. Each loader writes to `bin/$(Configuration)/$(Loader)/`, so a stale DLL cannot hide in a
-shared folder.
+shared folder. `Directory.Build.props` also gives each loader its own `obj/$(Loader)/`, because the restore
+assets in `obj/` are per target framework. With a shared `obj/`, a `net6.0` build followed by a
+`netstandard2.1` build resolves no reference at all.
 
 | Loader | Target | Loader libraries | Game assemblies | Copy target |
 | --- | --- | --- | --- | --- |
@@ -119,8 +121,9 @@ The source layout:
 - `PauseStageName.cs`: stage name label on the pause page.
 - `FrameScheduler.cs`: runs an action some frames later. The loader entry point ticks it.
 - `ModLog.cs`: log sink that the loader entry point sets.
-- `Interop.cs`: the IL2CPP and Mono differences. Object identity, delegate conversion, type casts, and the
-  private game fields.
+- `Interop.cs`: every IL2CPP and Mono difference. Object identity, delegate conversion, type casts, the
+  private game fields, and `PartySizeField`. No other file holds a runtime conditional, except the
+  `#if MELONLOADER` namespace prefix blocks.
 - `Loader/MelonEntry.cs`, `Loader/BepInExEntry.cs`, `Loader/BepInExMonoEntry.cs`: entry points. Only one is compiled.
 
 To compile the IL2CPP build without the game, run `tools/gen-interop.sh` and build with
@@ -236,12 +239,20 @@ Facts checked on 2026-09-12 on macOS 26.6.2, Apple M4 Pro, game build `25016043`
   The bleeding edge builds have `BepInEx-Unity.Mono-macos-x64` only.
 - `UnityPlayer.dylib` does not link `libmonobdwgc-2.0.dylib`. Unity 6 loads Mono with `dlopen`. Doorstop 4.5.0
   handles this: it hooks `dlopen` and `dlsym` with `plthook`.
-- The game must run as **`x86_64` under Rosetta 2**. The MonoMod build in BepInEx 5 (2022) has no `arm64`
-  detour backend, so `DetourHelper.Native` is null. A native `arm64` start fails in the preloader with
+- The game must run as **`x86_64` under Rosetta 2**. A native `arm64` start fails in the preloader with
   `HarmonyException: IL Compile Error` and `NullReferenceException` in `DetourHelper.GetIdentifiable`. The
   preloader writes the stack to `Vampire_Survivors.app/Contents/MacOS/preloader_<date>.log`.
+  The cause is not a missing `arm64` assembler: `DetourNativeARMPlatform` has an `AArch64` detour type.
+  `DetourRuntimeILPlatform` runs a self-test in its constructor that detours its own methods. The write to
+  the code page needs `pthread_jit_write_protect_np` on Apple Silicon, and no MonoMod build that BepInEx
+  ships calls it (BepInEx 5 has 22.01.29.01, BepInEx 6 BE 788 has 22.07.31.01). The self-test throws,
+  MonoMod caches the failure, and `DetourHelper.Runtime` then returns null. An upgrade to BepInEx 6 does not
+  help. Note that the `BepInEx-Unity.Mono-macos-x64` Doorstop **is** universal, so the loader would inject.
 - Patch `run_bepinex.sh`: `ARCHPREFERENCE="x86_64,arm64"` and `exec arch -x86_64 -e ...`. Also set
   `executable_name="Vampire_Survivors.app"`. `tools/install-loader.sh bepinex-macos` does all of it.
+  The script uses `sed` with a temp file, because BSD `sed` and GNU `sed` disagree on the argument of `-i`.
+  Do not add `perl` to it. `xattr` is part of macOS, is not in the dev shell, and is optional: the script
+  skips it when the command is absent.
 - Steam launch option: `"<game folder>/run_bepinex.sh" %command%`.
 - BepInEx writes `BepInEx/LogOutput.log` in the game folder, next to the app bundle.
 - The Mono assemblies keep the access level of the game fields. `RecapPage._DoneButton`,

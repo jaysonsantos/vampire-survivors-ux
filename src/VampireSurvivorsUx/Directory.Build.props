@@ -1,0 +1,14 @@
+<Project>
+
+  <!--
+    The loaders target different frameworks (net6.0 and netstandard2.1), and the NuGet restore assets in
+    obj/ are per framework. A shared obj/ makes the second build of a pair fail to resolve any reference.
+    MSBuild imports this file before the SDK props, which is the only place these two paths can be set.
+  -->
+  <PropertyGroup>
+    <Loader Condition="'$(Loader)' == ''">MelonLoader</Loader>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)obj/$(Loader)/</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>$(MSBuildThisFileDirectory)obj/$(Loader)/</MSBuildProjectExtensionsPath>
+  </PropertyGroup>
+
+</Project>

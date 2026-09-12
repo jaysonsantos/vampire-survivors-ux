@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
 #if IL2CPP
+using System.Runtime.InteropServices;
 using Il2CppInterop.Runtime;
 using Il2CppInterop.Runtime.InteropTypes;
 #else
@@ -11,11 +12,13 @@ using System.Reflection;
 #if MELONLOADER
 // MelonLoader generates the interop assemblies with the Il2Cpp namespace prefix.
 using Il2CppVampireSurvivors;
+using Il2CppVampireSurvivors.Framework;
 using Il2CppVampireSurvivors.Objects;
 using Il2CppVampireSurvivors.UI;
 #else
 // The BepInEx interop assemblies and the Mono game assemblies have no namespace prefix.
 using VampireSurvivors;
+using VampireSurvivors.Framework;
 using VampireSurvivors.Objects;
 using VampireSurvivors.UI;
 #endif
@@ -114,6 +117,80 @@ namespace VampireSurvivorsUx
                 if (field != null) return field;
             }
             return null;
+        }
+#endif
+    }
+
+    /// <summary>
+    /// Access to <c>MultiplayerManager.PartySize</c> (<c>int?</c>).
+    /// On Mono the field is a plain <c>Nullable</c>.
+    /// IL2CPP boxes an empty <c>Nullable</c> as null, so the generated getter throws. The IL2CPP build reads the
+    /// struct bytes in place. The interop field offsets of a value type include the 16 byte object header,
+    /// so subtract it.
+    /// </summary>
+    internal static class PartySizeField
+    {
+#if IL2CPP
+        private static bool _ready;
+        private static int _baseOffset;
+        private static int _hasValueOffset;
+        private static int _valueOffset;
+
+        private static bool Init()
+        {
+            if (_ready) return true;
+            try
+            {
+                IntPtr managerClass = Il2CppClassPointerStore<MultiplayerManager>.NativeClassPtr;
+                IntPtr nullableClass = Il2CppClassPointerStore<Il2CppSystem.Nullable<int>>.NativeClassPtr;
+                int header = 2 * IntPtr.Size;
+                _baseOffset = (int)IL2CPP.il2cpp_field_get_offset(IL2CPP.GetIl2CppField(managerClass, "PartySize"));
+                _hasValueOffset = (int)IL2CPP.il2cpp_field_get_offset(IL2CPP.GetIl2CppField(nullableClass, "hasValue")) - header;
+                _valueOffset = (int)IL2CPP.il2cpp_field_get_offset(IL2CPP.GetIl2CppField(nullableClass, "value")) - header;
+                if (_baseOffset <= 0 || _hasValueOffset < 0 || _valueOffset < 0 || _hasValueOffset == _valueOffset)
+                {
+                    ModLog.Warn("PartySize offsets look wrong: base=" + _baseOffset + " hasValue=" + _hasValueOffset + " value=" + _valueOffset);
+                    return false;
+                }
+                ModLog.Info("PartySize offsets: base=" + _baseOffset + " hasValue=" + _hasValueOffset + " value=" + _valueOffset);
+                _ready = true;
+                return true;
+            }
+            catch (Exception e)
+            {
+                ModLog.Error("PartySize offset lookup failed", e);
+                return false;
+            }
+        }
+
+        public static bool TryRead(MultiplayerManager manager, out int size)
+        {
+            size = 0;
+            if (!Init()) return false;
+            IntPtr obj = IL2CPP.Il2CppObjectBaseToPtrNotNull(manager);
+            bool hasValue = Marshal.ReadByte(obj, _baseOffset + _hasValueOffset) != 0;
+            size = Marshal.ReadInt32(obj, _baseOffset + _valueOffset);
+            return hasValue;
+        }
+
+        public static void Write(MultiplayerManager manager, int size)
+        {
+            if (!Init()) return;
+            IntPtr obj = IL2CPP.Il2CppObjectBaseToPtrNotNull(manager);
+            Marshal.WriteInt32(obj, _baseOffset + _valueOffset, size);
+            Marshal.WriteByte(obj, _baseOffset + _hasValueOffset, 1);
+        }
+#else
+        public static bool TryRead(MultiplayerManager manager, out int size)
+        {
+            int? value = manager.PartySize;
+            size = value ?? 0;
+            return value.HasValue;
+        }
+
+        public static void Write(MultiplayerManager manager, int size)
+        {
+            manager.PartySize = size;
         }
 #endif
     }
