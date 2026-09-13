@@ -43,7 +43,7 @@ Example setup: 4 characters, all CPU, all `Aggressive`.
 
 | Path | Content |
 | --- | --- |
-| `flake.nix`, `flake.lock` | Dev shell with `dotnet-sdk_8` (8.0.424) and `ilspycmd` (9.1). |
+| `flake.nix`, `flake.lock` | Dev shell with `dotnet-sdk_8` (8.0.424), `ilspycmd` (9.1), and `shellcheck`. |
 | `.envrc` | `use flake`. The global gitignore of the user ignores this file. |
 | `reference/managed-mono-build25016043/` | Mono DLLs from `VampireSurvivors_Data/Managed/` of the Linux build. |
 | `reference/decompiled/VampireSurvivors.Runtime/` | Decompiled C# (3017 files). Most game logic is here. |
@@ -52,6 +52,7 @@ Example setup: 4 characters, all CPU, all `Aggressive`.
 | `src/VampireSurvivorsUx/` | The mod. One csproj, one core, three loader entry points. |
 | `reference/loaders/` | Loader zip files that `tools/install-loader.sh` downloads. |
 | `tools/gen-interop.sh` | Makes interop assemblies from `GameAssembly.dll` with Cpp2IL and Il2CppInterop. |
+| `tools/build-release.sh` | Builds the two release files into `dist/`. |
 
 Public repository: `github.com/jaysonsantos/vampire-survivors-ux` (MIT). `README.md` has the install steps for players.
 
@@ -141,6 +142,38 @@ nix develop -c dotnet build src/VampireSurvivorsUx/VampireSurvivorsUx.csproj -c 
   -p:GameAsmPath=$PWD/reference/managed-mono-build25016043 \
   -p:LoaderLibPath=$PWD/reference/loaders/bepinex5/BepInEx/core -p:CopyToMods=false
 ```
+
+## Step 3: Make a release
+
+A release has one file for each platform:
+
+| Asset | Loader | Platform |
+| --- | --- | --- |
+| `VampireSurvivorsUx.dll` | `BepInEx` | Windows, Linux, Steam Deck |
+| `VampireSurvivorsUx-mono.dll` | `BepInExMono` | macOS |
+
+`tools/build-release.sh` builds both and writes them to `dist/`. It finds the game assemblies in this order:
+
+- IL2CPP: `$GAME_PATH/BepInEx/interop`, then `reference/interop/Il2CppAssemblies`.
+- Mono: `$MACOS_GAME_PATH/Vampire_Survivors.app/Contents/Resources/Data/Managed`, then
+  `$GAME_PATH/VampireSurvivors_Data/Managed`, then `reference/managed-mono-build*`.
+- BepInEx 5 libraries: `$MACOS_GAME_PATH/BepInEx/core`, then `reference/loaders/bepinex5/BepInEx/core`.
+
+Set `IL2CPP_ASM`, `MONO_ASM`, or `MONO_LIB` to select a folder direct. The steps:
+
+1. Set `<Version>` in `src/VampireSurvivorsUx/VampireSurvivorsUx.csproj`. Commit the change.
+2. Run `nix develop -c tools/build-release.sh`.
+3. Run the test plan on the two platforms.
+4. Publish:
+
+   ```sh
+   gh release create vX.Y.Z dist/VampireSurvivorsUx.dll dist/VampireSurvivorsUx-mono.dll \
+     --title vX.Y.Z --notes-file <notes>
+   ```
+
+**A build server cannot make a release.** Both builds reference the game assemblies, and those files belong to
+poncle. They are not in the repository and a public runner cannot get them. CI checks the shell scripts, the
+repository content, and the loader matrix only. Build the release on a computer that has the game.
 
 ## Game code map
 
