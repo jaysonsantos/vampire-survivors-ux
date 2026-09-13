@@ -34,6 +34,13 @@ The mod has two builds. Pick the one for your platform.
 | Windows, Linux, Steam Deck | Windows build (`VampireSurvivors.exe` is a `PE32+` file), IL2CPP | [BepInEx Unity.IL2CPP, bleeding edge build 788](https://builds.bepinex.dev/projects/bepinex_be) or newer |
 | macOS | macOS build (`Vampire_Survivors.app`), Mono | [BepInEx 5.4.23.5, macOS universal](https://github.com/BepInEx/BepInEx/releases) |
 
+The [releases page](https://github.com/jaysonsantos/vampire-survivors-ux/releases) has one file for each build:
+
+| File | Platform |
+| --- | --- |
+| `VampireSurvivorsUx.dll` | Windows, Linux, Steam Deck |
+| `VampireSurvivorsUx-mono.dll` | macOS |
+
 On Linux and on the Steam Deck, force Proton. The native Linux build uses Mono and does not work with either build of the mod.
 
 Tested on 2026-09-10 with game build `25016043` (v1.16.107, Unity 6000.0.62f1) on Linux with Proton.
@@ -86,6 +93,10 @@ The build writes `bin/Release/<Loader>/VampireSurvivorsUx.dll` and copies it to 
 folder. Set `-p:GamePath=...` when the game is in another folder. Without `nix`, use the .NET 8 SDK.
 
 `tools/gen-interop.sh` makes the interop assemblies without a game start. See `AGENTS.md` for the development notes.
+
+`tools/build-release.sh` makes both release files in `dist/`. It needs the game assemblies for the two builds
+on one computer. A build server cannot make the release, because the game assemblies belong to poncle and are
+not in the repository.
 
 ## Install on macOS
 

@@ -9,3 +9,6 @@ obj/
 # direnv / nix
 .direnv/
 result
+
+# Release output
+dist/

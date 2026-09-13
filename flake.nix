@@ -1,5 +1,5 @@
 {
-  description = "Vampire Survivors MelonLoader mod: Quick Retry / Next Stage";
+  description = "Vampire Survivors UX mod: recap buttons, double click, speed, pause label";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
@@ -20,6 +20,7 @@
             packages = [
               dotnet
               pkgs.ilspycmd
+              pkgs.shellcheck
             ];
 
             DOTNET_ROOT = "${dotnet}/share/dotnet";
