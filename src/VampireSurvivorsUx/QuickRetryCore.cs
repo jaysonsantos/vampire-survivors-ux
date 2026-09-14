@@ -41,7 +41,8 @@ namespace VampireSurvivorsUx
     /// <summary>Loader-independent mod logic. The loader entry point calls <see cref="Initialize"/>.</summary>
     internal static class QuickRetryCore
     {
-        public const string Version = "0.1.1";
+        /// <summary>The Version property of the csproj. ModVersion.g.cs is generated at build time.</summary>
+        public const string Version = ModVersion.Value;
         private const string RetryButtonName = "QuickRetry_RetryButton";
         private const string NextStageButtonName = "QuickRetry_NextStageButton";
         private const string NextNewStageButtonName = "QuickRetry_NextNewStageButton";

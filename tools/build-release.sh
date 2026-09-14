@@ -30,6 +30,15 @@ pick() {
   return 1
 }
 
+# The reference/managed-mono-build<BUILD> folders, newest build ID first.
+# A plain glob gives lexical order, so it would select an old build after a game update.
+mono_refs() {
+  local d
+  for d in "$REPO"/reference/managed-mono-build*; do
+    [ -d "$d" ] && printf '%s\n' "$d"
+  done | sort -V -r
+}
+
 GAME_IL2CPP="${GAME_PATH:-$HOME/.local/share/Steam/steamapps/common/Vampire Survivors}"
 GAME_MONO="${MACOS_GAME_PATH:-$HOME/Library/Application Support/Steam/steamapps/common/Vampire Survivors}"
 
@@ -42,10 +51,18 @@ fi
 
 MONO_ASM="${MONO_ASM:-}"
 if [ -z "$MONO_ASM" ]; then
+  MONO_REFS=()
+  while IFS= read -r d; do
+    MONO_REFS+=("$d")
+  done < <(mono_refs)
+  if [ "${#MONO_REFS[@]}" -gt 1 ]; then
+    echo "More than one reference/managed-mono-build* folder. This build uses ${MONO_REFS[0]}." >&2
+    echo "Set MONO_ASM to select another folder." >&2
+  fi
   MONO_ASM="$(pick \
     "$GAME_MONO/Vampire_Survivors.app/Contents/Resources/Data/Managed" \
     "$GAME_IL2CPP/VampireSurvivors_Data/Managed" \
-    "$REPO"/reference/managed-mono-build* || true)"
+    ${MONO_REFS[@]+"${MONO_REFS[@]}"} || true)"
 fi
 
 MONO_LIB="${MONO_LIB:-}"
