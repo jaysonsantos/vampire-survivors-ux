@@ -156,12 +156,17 @@ A release has one file for each platform:
 
 - IL2CPP: `$GAME_PATH/BepInEx/interop`, then `reference/interop/Il2CppAssemblies`.
 - Mono: `$MACOS_GAME_PATH/Vampire_Survivors.app/Contents/Resources/Data/Managed`, then
-  `$GAME_PATH/VampireSurvivors_Data/Managed`, then `reference/managed-mono-build*`.
+  `$GAME_PATH/VampireSurvivors_Data/Managed`, then `reference/managed-mono-build*`. With more than one
+  `managed-mono-build*` folder, the script takes the newest build ID and writes a warning. Set `MONO_ASM` to
+  select another folder.
 - BepInEx 5 libraries: `$MACOS_GAME_PATH/BepInEx/core`, then `reference/loaders/bepinex5/BepInEx/core`.
 
 Set `IL2CPP_ASM`, `MONO_ASM`, or `MONO_LIB` to select a folder direct. The steps:
 
-1. Set `<Version>` in `src/VampireSurvivorsUx/VampireSurvivorsUx.csproj`. Commit the change.
+1. Set `<Version>` in `src/VampireSurvivorsUx/VampireSurvivorsUx.csproj`. Commit the change. This property is
+   the one source of the version. The `GenerateModVersion` target writes
+   `obj/$(Loader)/$(Configuration)/ModVersion.g.cs`, and `QuickRetryCore.Version` gives that value to the
+   `BepInPlugin` and `MelonInfo` attributes.
 2. Run `nix develop -c tools/build-release.sh`.
 3. Run the test plan on the two platforms.
 4. Publish:
