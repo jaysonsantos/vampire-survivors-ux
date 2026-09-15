@@ -9,9 +9,13 @@ The first feature adds three buttons to the end-of-run recap page:
 
 On the character selection page, a double click on a character selects and confirms it (`SelectCharacter(false)` then `ConfirmCharacter()` one frame later). This works in solo and in party mode.
 In the party size and CPU type popups (`LargeMultiOptionPopup`), a second click on the same option within 0.45 s confirms it (postfix on `SelectOption(GameObject)` calls `Confirm()`).
+The collection page gets a **Seal all** button below the **Unseal all** button of the game (postfix on
+`CollectionsPage.OnShowStart`). It seals every seen and `sealable` item and weapon, until `Config.Seals` is full.
 The pause page shows the name of the current stage at the top (postfix on `PausePage.OnShowStart`).
 A double click on an arcana card selects and confirms it, in place of a click on the card and then a click on
 the GET button (postfix on `ArcanaCardUI.OnClick` calls `Select()` one frame later).
+A double click on a power-up buys it (postfix on `PowerUpItemUI.SetInfo` calls `PowerUpsPage.PurchaseSelected()`
+one frame later). A maxed out power-up is ignored, because `Purchase` toggles it in that state.
 The speed limit of the game goes from 2x to 5x. The toggle order is 1x, 2x, 3x, 4x, 5x, then 1x.
 
 "Setup" means the main character, the local co-op slots (character and CPU behaviour), the stage, the BGM, and the run modifiers.
@@ -125,6 +129,8 @@ The source layout:
 - `PauseStageName.cs`: stage name label on the pause page.
 - `GameSpeed.cs`: raises the speed limit to 5x and replaces the toggle order.
 - `ArcanaDoubleClick.cs`: double click on an arcana card confirms it.
+- `CollectionSealAll.cs`: the Seal all button on the collection page.
+- `PowerUpDoubleClick.cs`: double click on a power-up buys it.
 - `FrameScheduler.cs`: runs an action some frames later. The loader entry point ticks it.
 - `ModLog.cs`: log sink that the loader entry point sets.
 - `Interop.cs`: every IL2CPP and Mono difference. Object identity, delegate conversion, type casts, the
@@ -249,6 +255,38 @@ Paths are relative to `reference/decompiled/VampireSurvivors.Runtime/`. Line num
   button. The major page, the minor page, and the Darkana page all use this one class.
 - `VampireSurvivors.UI/SurvarotsSelectionPage.cs`: the same shape. Public `Select()` (line 986) and the same two
   flags.
+
+### Collection page
+
+- `VampireSurvivors.UI/CollectionsPage.cs`: `OnShowStart` (line 113) builds the page. `UnsealAll()` (line 778) is
+  the target of the Unseal all button of the prefab. `OnHideStart` (line 322) calls `_playerOptions.Save()`, so a
+  change of the seal lists is saved when the page closes.
+- The seal rules of a click: `CollectionItemUI.RegisterClick` (line 269) needs `_seen` and `data.sealable`, then
+  `CollectionsPage.ItemClicked`/`WeaponClicked` check `PlayerOptionsData.Seals` against the used seals and skip
+  an item in `ContentGroupSealedItems`/`ContentGroupSealedWeapons`. The mod repeats these rules in a loop.
+- `PlayerOptions.GetMaxSeals()` (line 667) counts the SEAL power-ups, writes `Config.Seals`, and returns 65535
+  for 100 or more. `GetUsedSeals()` (line 696) is `SealedItems.Count + SealedWeapons.Count`.
+- `VampireSurvivors.UI/SealPanel.cs`: `UpdateValues()` writes the "x / y" counter. Call it after a change.
+- `VampireSurvivors.Framework/SoundManager.cs:124`: `PlaySound(SfxType)` returns `PlaySoundResult`, which lives in
+  `MAScripts.dll`. The csproj references that assembly.
+- The mod finds the Unseal all button by the persistent listener name of `Button.onClick` (`UnsealAll`), because
+  the object name of the prefab can change. The fallback is the object name.
+- The button of the game is `Unseal All Button` in `MegaSealPanel`, which has a `VerticalLayoutGroup`. A layout
+  group moves the clone only when it is enabled and it runs. One frame after the clone, the mod compares the two
+  world positions. With the same position, it moves the clone down by hand. Without this step the clone covers
+  the button of the game, and the page looks like it lost the Unseal all button.
+
+### Power-up page
+
+- `VampireSurvivors.UI/PowerUpsPage.cs`: `Purchase(data, type, item)` (line 127) is the whole buy step: price
+  check, `UpdateAfterPurchase`, `BuyPowerUpSignal`, `RemoveCoins`, and the sound. `PurchaseSelected()` (line 188)
+  is what the BUY button calls; it buys `_selected` and gives the focus back to the item.
+  `GetCurrentSelected()` (line 199) returns `_selected`.
+- `Purchase` toggles a maxed out power-up on and off (`ToggleActive`) when the rank is full or the coins are
+  too few. The mod skips an item where `PowerUpItemUI.IsMaxedOut()` is true, so a double click never toggles.
+- `VampireSurvivors.UI/PowerUpItemUI.cs`: `SetInfo()` (line 129) runs on every click and on every selection with
+  a pad or the keyboard. It calls `PowerUpsPage.SetInfo`, which writes `_selected`. `_data`, `_type`, and `_page`
+  are public fields. `CheckMaxedOut()` removes the click listener at the maximum rank.
 
 ### Pause page
 
@@ -410,11 +448,16 @@ Notes:
 2. Set 4 local slots, all CPU, all `Aggressive`. Click Retry. Check all 4 slots and their `AIType`.
 3. Click Next stage. Check that the stage is the next unlocked stage and the slots do not change.
 4. Click Done. Check that the game returns to the main menu as before.
-5. Read the loader log (`MelonLoader/Latest.log` or `BepInEx/LogOutput.log`). It must show no errors from `VampireSurvivorsUx`. The first recap page logs the Done button parent and layout. Use it to correct the button positions.
-6. Copy `bin/Release/BepInEx/VampireSurvivorsUx.dll` to the Steam Deck. Set the same Proton tool and launch option. Repeat tests 1-3.
-7. On macOS, install with `tools/install-loader.sh bepinex-macos`, copy
+5. Open the collection page. Click **Seal all**. Check that the seal counter is full and that the sealed items
+   show the seal icon. Leave the page, open it again, and check that the seals are still there. Click
+   **Unseal all** and check that every seal is gone.
+6. Open the power-up page. Double click a power-up that you can pay for. Check that the coins go down by the
+   price and that the rank goes up. Double click a maxed out power-up. Check that nothing changes.
+7. Read the loader log (`MelonLoader/Latest.log` or `BepInEx/LogOutput.log`). It must show no errors from `VampireSurvivorsUx`. The first recap page logs the Done button parent and layout. Use it to correct the button positions.
+8. Copy `bin/Release/BepInEx/VampireSurvivorsUx.dll` to the Steam Deck. Set the same Proton tool and launch option. Repeat tests 1-3.
+9. On macOS, install with `tools/install-loader.sh bepinex-macos`, copy
    `bin/Release/BepInExMono/VampireSurvivorsUx.dll` to `BepInEx/plugins/`, set the Steam launch option, and
-   repeat tests 1-5.
+   repeat tests 1-7.
 
 ## When the game updates
 

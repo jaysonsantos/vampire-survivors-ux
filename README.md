@@ -15,6 +15,12 @@ The mod also adds double click to the menus:
 - On the character page, a double click on a character selects and confirms it.
 - In the party size popup and in the CPU type popup, a double click on an option confirms it.
 - On an arcana page, a double click on a card selects and confirms it. No second click on **GET** is necessary.
+- On the power-up page, a double click on a power-up buys it. No second click on **BUY** is necessary. A power-up
+  at the maximum rank does not change.
+
+On the collection page, the mod adds a **Seal all** button below **Unseal all**. It seals every item and weapon
+that a click can seal, until the seal limit is full. The rules of the game do not change: an item must be found
+and sealable, and the number of seals is still the limit.
 
 When the game is paused, the mod shows the name of the current stage at the top of the screen.
 

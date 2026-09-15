@@ -70,6 +70,9 @@
     <PauseSystemDll Condition="'$(PauseSystemDll)' == ''">$(GameAsmPath)/PauseSystem.dll</PauseSystemDll>
     <RewiredCoreDll Condition="Exists('$(GameAsmPath)/Il2CppRewired_Core.dll')">$(GameAsmPath)/Il2CppRewired_Core.dll</RewiredCoreDll>
     <RewiredCoreDll Condition="'$(RewiredCoreDll)' == ''">$(GameAsmPath)/Rewired_Core.dll</RewiredCoreDll>
+    <!-- SoundManager.PlaySound returns PlaySoundResult, which lives in MAScripts. -->
+    <MaScriptsDll Condition="Exists('$(GameAsmPath)/Il2CppMAScripts.dll')">$(GameAsmPath)/Il2CppMAScripts.dll</MaScriptsDll>
+    <MaScriptsDll Condition="'$(MaScriptsDll)' == ''">$(GameAsmPath)/MAScripts.dll</MaScriptsDll>
   </PropertyGroup>
 
   <ItemGroup>
@@ -85,6 +88,7 @@
     <Reference Include="l2localization"><HintPath>$(LocalizationDll)</HintPath><Private>false</Private></Reference>
     <Reference Include="PauseSystem"><HintPath>$(PauseSystemDll)</HintPath><Private>false</Private></Reference>
     <Reference Include="Rewired_Core"><HintPath>$(RewiredCoreDll)</HintPath><Private>false</Private></Reference>
+    <Reference Include="MAScripts"><HintPath>$(MaScriptsDll)</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.CoreModule"><HintPath>$(GameAsmPath)/UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.InputLegacyModule"><HintPath>$(GameAsmPath)/UnityEngine.InputLegacyModule.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.UI"><HintPath>$(GameAsmPath)/UnityEngine.UI.dll</HintPath><Private>false</Private></Reference>
