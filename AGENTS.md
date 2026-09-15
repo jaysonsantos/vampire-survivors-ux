@@ -15,10 +15,11 @@ game (`PopupManager.CreateLargeMultiOption`) with `Aggressive` and `Defensive`. 
 slot. Then the mod picks four random characters from `PlayerOptionsData.BoughtCharacters` and the next stage
 that the main character has not completed, and it opens a second popup with the run modifiers: hyper, hurry,
 arcanas, limit break, inverse, endless, random events, random level ups, power creep (golden eggs or
-survarots), and share passives. Every line shows the state ("On", "Off", or the power creep name). A pick
-writes the value into `Config` and opens the popup again at the same line, because the popup of the game has
-one confirm for one line. The first line, **Start run**, writes the slots, sets `PartySize` to 4 and
-`PartyModeEnabled` to true, picks the BGM (after the inverse toggle), and fires `START_GAME`. A slot with a
+survarots), and share passives. The tick of a line shows the state of that modifier, same as the tick boxes of
+the stage select page, and the text below the name shows "On", "Off", or the power creep name. A postfix on
+`SelectOption(GameObject)` toggles the line in place and gives the focus back to the line, so the popup stays
+open. Confirm writes the slots, sets `PartySize` to 4 and `PartyModeEnabled` to true, picks the BGM (after the
+inverse toggle), and fires `START_GAME`. A slot with a
 `RewiredPlayer` keeps `AIType.None`. The button needs the party relic (`RELIC_PARTY` collected and not
 sealed), same rule as `CharacterSelectionPage.PartyModeEnabled`.
 The collection page gets a **Seal all** button below the **Unseal all** button of the game (postfix on
@@ -282,6 +283,11 @@ Paths are relative to `reference/decompiled/VampireSurvivors.Runtime/`. Line num
 - `VampireSurvivors.UI/LargeMultiOptionPopup.cs`: `Confirm()` (line 164) calls the callback with
   `_selectedIndex`, which is 0 when the player confirms without a click. `Initialize` reads the Rewired player
   from `MultiplayerManager`, so open the popup before the mod sets `PartySize`.
+- A click on a line calls `SelectOption(GameObject)`, which sets the tick of that line and moves the focus to
+  the Confirm button. The tick is child 2 of the line. `FrameDelays()` writes the ticks again one frame after
+  `Show()`, so a mod that uses the tick as a state box must write it after that frame.
+- `LargeMultiOptionPopupItem` has public `Title`, `Description`, `Image`, `Tick`, and `SetTick(bool)`. The
+  lines live in `BasePopup._spawned`.
 - The IL2CPP interop call unboxes the `textAlignment` argument with `Il2CppObjectBaseToPtrNotNull`, so it needs
   an empty `Il2CppSystem.Nullable<TextAlignmentOptions>`. A `null` throws.
 - `VampireSurvivors.UI/QuickStartGameController.cs`: `GetValidQuickCharacters()` is the model for the character

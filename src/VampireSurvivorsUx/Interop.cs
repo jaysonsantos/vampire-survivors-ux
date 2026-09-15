@@ -89,6 +89,15 @@ namespace VampireSurvivorsUx
 
         public static int SelectedIndex(LargeMultiOptionPopup popup) => popup._selectedIndex;
 
+        public static GameObject[] SpawnedOptions(LargeMultiOptionPopup popup)
+        {
+            var list = popup._spawned;
+            if (list == null) return new GameObject[0];
+            var items = new GameObject[list.Count];
+            for (int i = 0; i < items.Length; i++) items[i] = list[i];
+            return items;
+        }
+
         public static RectTransform ResumeButton(PausePage page) => page._ResumeButton;
 
         public static GameObject FastForwardIcon1(FastForwardButton button) => button._icon1;
@@ -117,6 +126,12 @@ namespace VampireSurvivorsUx
         {
             FieldInfo field = Find(popup.GetType(), "_selectedIndex");
             return field != null ? (int)field.GetValue(popup) : -1;
+        }
+
+        public static GameObject[] SpawnedOptions(LargeMultiOptionPopup popup)
+        {
+            var list = Read<System.Collections.Generic.List<GameObject>>(popup, "_spawned");
+            return list != null ? list.ToArray() : new GameObject[0];
         }
 
         public static RectTransform ResumeButton(PausePage page) => Read<RectTransform>(page, "_ResumeButton");

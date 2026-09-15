@@ -465,6 +465,8 @@ namespace VampireSurvivorsUx
             {
                 try
                 {
+                    // The modifier popup of Random party toggles the line instead of a second click to confirm.
+                    if (RandomParty.HandleOptionSelected(__instance)) return;
                     ObjId id = ObjId.Of(__instance);
                     int index = Priv.SelectedIndex(__instance);
                     float now = Time.unscaledTime;

@@ -55,13 +55,16 @@ namespace VampireSurvivorsUx
         private static StageType _stage;
         private static List<Row> _rows;
 
+        // The open modifier popup. A click on a line toggles that line in place.
+        private static LargeMultiOptionPopup _popup;
+        private static ObjId _popupId;
+
         /// <summary>Every popup needs its own id, because the mod opens the next one before the old one closes.</summary>
         private static int _popupSerial;
 
-        /// <summary>One line of the modifier popup.</summary>
+        /// <summary>One line of the modifier popup. Every line is a modifier, and Confirm starts the run.</summary>
         private enum Row
         {
-            Start,
             Hyper,
             Hurry,
             Arcanas,
@@ -267,7 +270,7 @@ namespace VampireSurvivorsUx
                 _picks = PickCharacters(options, data, SlotCount);
                 _stage = PickStage(data, options, _picks[0]);
                 ModLog.Info("Random party: cpu=" + ai + " main=" + _picks[0] + " stage=" + _stage);
-                ShowModifiers(options, data, 0);
+                ShowModifiers(options, data);
             }
             catch (Exception e)
             {
@@ -278,10 +281,10 @@ namespace VampireSurvivorsUx
         // ---------------------------------------------------------------- modifier popup
 
         /// <summary>
-        /// Shows the run modifiers. Every line toggles one modifier and opens the popup again, so the player
-        /// changes as many modifiers as necessary. The first line starts the run.
+        /// Shows the run modifiers. The tick of a line shows the state of that modifier, same as the tick boxes
+        /// of the stage select page. A click on a line toggles it. Confirm starts the run.
         /// </summary>
-        private static void ShowModifiers(PlayerOptions options, DataManager data, int selectIndex)
+        private static void ShowModifiers(PlayerOptions options, DataManager data)
         {
             PlayerOptionsData config = options.Config;
             _rows = BuildRows(config, _stage);
@@ -294,14 +297,65 @@ namespace VampireSurvivorsUx
             }
             string stageName = StageName(data, _stage);
             LargeMultiOptionPopup popup = Popups.ShowOptions(NextPopupId(), "Random party", stageName,
-                labels, values, null, OnRowPicked, OnCancelled);
+                labels, values, null, OnConfirmed, OnCancelled);
             if (popup == null) return;
-            if (selectIndex > 0 && selectIndex < _rows.Count) popup.SelectOption(selectIndex);
+            _popup = popup;
+            _popupId = ObjId.Of(popup);
+            // The popup writes the ticks one frame after Show, so set the states after that frame.
+            FrameScheduler.RunAfterFrames(2, RefreshRows);
+        }
+
+        /// <summary>Writes the label, the value, and the tick of every line from <c>Config</c>.</summary>
+        private static void RefreshRows()
+        {
+            if (_popup == null || _rows == null) return;
+            PlayerOptions options = SystemPlatform.Instance?.PlayerOptions;
+            if (options == null) return;
+            PlayerOptionsData config = options.Config;
+            GameObject[] items = Priv.SpawnedOptions(_popup);
+            int count = Math.Min(items.Length, _rows.Count);
+            for (int i = 0; i < count; i++)
+            {
+                var item = items[i] != null ? items[i].GetComponent<LargeMultiOptionPopupItem>() : null;
+                if (item == null) continue;
+                if (item.Title != null) item.Title.text = RowLabel(_rows[i]);
+                if (item.Description != null) item.Description.text = RowValue(config, _rows[i]);
+                item.SetTick(RowIsOn(config, _rows[i]));
+            }
+        }
+
+        /// <summary>
+        /// A click on a line of the modifier popup. The game selects the line and moves the focus to Confirm.
+        /// The mod toggles the modifier instead and gives the focus back to the line.
+        /// Returns true when the popup is the modifier popup of the mod.
+        /// </summary>
+        public static bool HandleOptionSelected(LargeMultiOptionPopup popup)
+        {
+            if (_popup == null || _rows == null || !ObjId.Of(popup).Same(_popupId)) return false;
+            PlayerOptions options = SystemPlatform.Instance?.PlayerOptions;
+            if (options == null) return true;
+            int index = Priv.SelectedIndex(popup);
+            if (index < 0 || index >= _rows.Count) return true;
+
+            PlayerOptionsData config = options.Config;
+            Row row = _rows[index];
+            if (row == Row.PowerCreep) CyclePowerCreep(config);
+            else SetBool(config, row, !GetBool(config, row));
+            ModLog.Info("Random party: " + RowLabel(row) + " -> " + RowValue(config, row));
+            RefreshRows();
+
+            GameObject[] items = Priv.SpawnedOptions(popup);
+            if (index < items.Length && items[index] != null)
+            {
+                var selectable = items[index].GetComponent<Selectable>();
+                if (selectable != null) selectable.Select();
+            }
+            return true;
         }
 
         private static List<Row> BuildRows(PlayerOptionsData config, StageType stage)
         {
-            var rows = new List<Row> { Row.Start };
+            var rows = new List<Row>();
             if (config.UnlockedHypers != null && config.UnlockedHypers.Contains(stage)) rows.Add(Row.Hyper);
             if (config.HasCollectedItem(ItemType.RELIC_TEAR)) rows.Add(Row.Hurry);
             if (config.HasCollectedItem(ItemType.RELIC_RANDOMAZZO) || config.HasCollectedItem(ItemType.RELIC_DARKASSO))
@@ -328,7 +382,6 @@ namespace VampireSurvivorsUx
         {
             switch (row)
             {
-                case Row.Start: return "Start run";
                 case Row.Hyper: return "Hyper";
                 case Row.Hurry: return "Hurry";
                 case Row.Arcanas: return "Arcanas";
@@ -347,13 +400,19 @@ namespace VampireSurvivorsUx
         {
             switch (row)
             {
-                case Row.Start: return string.Empty;
                 case Row.PowerCreep:
                     if (config.SelectedGoldenEggs) return "Golden eggs";
                     if (config.SelectedSurvarots) return "Survarots";
                     return "Off";
                 default: return GetBool(config, row) ? "On" : "Off";
             }
+        }
+
+        /// <summary>The tick of a line. Power creep is on when eggs or survarots are on.</summary>
+        private static bool RowIsOn(PlayerOptionsData config, Row row)
+        {
+            if (row == Row.PowerCreep) return config.SelectedGoldenEggs || config.SelectedSurvarots;
+            return GetBool(config, row);
         }
 
         private static bool GetBool(PlayerOptionsData config, Row row)
@@ -411,39 +470,33 @@ namespace VampireSurvivorsUx
             }
         }
 
-        private static void OnRowPicked(int index)
+        /// <summary>Confirm on the modifier popup starts the run.</summary>
+        private static void OnConfirmed(int index)
         {
             try
             {
+                _popup = null;
+                _popupId = ObjId.None;
                 PlayerOptions options = SystemPlatform.Instance?.PlayerOptions;
                 DataManager data = SystemPlatform.Instance?.DataManager;
-                if (options == null || data == null || _rows == null)
+                if (options == null || data == null)
                 {
                     ModLog.Error("Random party: game services missing. No run started.");
                     return;
                 }
-                if (index < 0 || index >= _rows.Count) index = 0;
-                Row row = _rows[index];
-                if (row == Row.Start)
-                {
-                    StartRun(options, data);
-                    return;
-                }
-                PlayerOptionsData config = options.Config;
-                if (row == Row.PowerCreep) CyclePowerCreep(config);
-                else SetBool(config, row, !GetBool(config, row));
-                ModLog.Info("Random party: " + RowLabel(row) + " -> " + RowValue(config, row));
-                ShowModifiers(options, data, index);
+                StartRun(options, data);
             }
             catch (Exception e)
             {
-                ModLog.Error("Random party: the modifier popup failed", e);
+                ModLog.Error("Random party: the start failed", e);
             }
         }
 
         private static void OnCancelled()
         {
             ModLog.Info("Random party: cancelled.");
+            _popup = null;
+            _popupId = ObjId.None;
             _rows = null;
             _picks = null;
         }
