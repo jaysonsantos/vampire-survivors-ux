@@ -11,6 +11,7 @@ using System.Reflection;
 #endif
 #if MELONLOADER
 // MelonLoader generates the interop assemblies with the Il2Cpp namespace prefix.
+using Il2CppTMPro;
 using Il2CppVampireSurvivors;
 using Il2CppVampireSurvivors.App.UI;
 using Il2CppVampireSurvivors.Framework;
@@ -19,6 +20,7 @@ using Il2CppVampireSurvivors.Objects;
 using Il2CppVampireSurvivors.UI;
 #else
 // The BepInEx interop assemblies and the Mono game assemblies have no namespace prefix.
+using TMPro;
 using VampireSurvivors;
 using VampireSurvivors.App.UI;
 using VampireSurvivors.Framework;
@@ -83,6 +85,8 @@ namespace VampireSurvivorsUx
 
         public static PlayerOptions PlayerOptionsOf(RecapPage page) => page._playerOptions;
 
+        public static Button QuickStartButton(MainMenuPage page) => page._QuickStartButton;
+
         public static int SelectedIndex(LargeMultiOptionPopup popup) => popup._selectedIndex;
 
         public static RectTransform ResumeButton(PausePage page) => page._ResumeButton;
@@ -106,6 +110,8 @@ namespace VampireSurvivorsUx
         public static Selectable DoneButton(RecapPage page) => Read<Selectable>(page, "_DoneButton");
 
         public static PlayerOptions PlayerOptionsOf(RecapPage page) => Read<PlayerOptions>(page, "_playerOptions");
+
+        public static Button QuickStartButton(MainMenuPage page) => Read<Button>(page, "_QuickStartButton");
 
         public static int SelectedIndex(LargeMultiOptionPopup popup)
         {
@@ -182,6 +188,40 @@ namespace VampireSurvivorsUx
             return null;
         }
 #endif
+    }
+
+    /// <summary>
+    /// The multi option popup of the game. The list type and the callback type differ between the runtimes.
+    /// </summary>
+    internal static class Popups
+    {
+        /// <summary>Keeps the managed callback alive while the popup is open.</summary>
+        private static Action<int> _callback;
+
+        public static void ShowOptions(string id, string title, string[] labels, Sprite[] icons, Action<int> onPick)
+        {
+            _callback = onPick;
+#if IL2CPP
+            var options = new Il2CppSystem.Collections.Generic.List<OptionDataSet>();
+            for (int i = 0; i < labels.Length; i++)
+            {
+                options.Add(new OptionDataSet(labels[i], string.Empty, icons != null ? icons[i] : null));
+            }
+            var callback = DelegateSupport.ConvertDelegate<Il2CppSystem.Action<int>>(_callback);
+            // The interop call unboxes the alignment argument, so it needs a real empty Nullable, not null.
+            var alignment = new Il2CppSystem.Nullable<TextAlignmentOptions>();
+#else
+            var options = new System.Collections.Generic.List<OptionDataSet>();
+            for (int i = 0; i < labels.Length; i++)
+            {
+                options.Add(new OptionDataSet(labels[i], string.Empty, icons != null ? icons[i] : null));
+            }
+            Action<int> callback = _callback;
+            TextAlignmentOptions? alignment = null;
+#endif
+            // The labels are already translated, so the popup must not translate them again.
+            PopupManager.CreateLargeMultiOption(id, title, string.Empty, options, callback, null, false, alignment, true);
+        }
     }
 
     /// <summary>

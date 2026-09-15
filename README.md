@@ -18,6 +18,12 @@ The mod also adds double click to the menus:
 - On the power-up page, a double click on a power-up buys it. No second click on **BUY** is necessary. A power-up
   at the maximum rank does not change.
 
+On the main menu, the mod adds a **Random party** button above **Quick start**. It asks one time for the CPU
+behaviour (aggressive or defensive) and gives that behaviour to every CPU slot. Then it fills the four local
+slots with random bought characters and starts a run on the next stage that the main character has not
+completed yet. A slot with a controller keeps its player. The button needs the party relic, same as the party
+mode of the game.
+
 On the collection page, the mod adds a **Seal all** button below **Unseal all**. It seals every item and weapon
 that a click can seal, until the seal limit is full. The rules of the game do not change: an item must be found
 and sealable, and the number of seals is still the limit.

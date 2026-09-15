@@ -9,6 +9,13 @@ The first feature adds three buttons to the end-of-run recap page:
 
 On the character selection page, a double click on a character selects and confirms it (`SelectCharacter(false)` then `ConfirmCharacter()` one frame later). This works in solo and in party mode.
 In the party size and CPU type popups (`LargeMultiOptionPopup`), a second click on the same option within 0.45 s confirms it (postfix on `SelectOption(GameObject)` calls `Confirm()`).
+The main menu gets a **Random party** button, a clone of the Quick start button and a child of it, so it
+follows every layout move (postfix on `MainMenuPage.OnShowStart`). A click opens the multi option popup of the
+game (`PopupManager.CreateLargeMultiOption`) with `Aggressive` and `Defensive`. The choice goes to every CPU
+slot. The mod then picks four random characters from `PlayerOptionsData.BoughtCharacters`, writes the slots,
+sets `PartySize` to 4 and `PartyModeEnabled` to true, selects the next stage that the main character has not
+completed, and fires `START_GAME`. A slot with a `RewiredPlayer` keeps `AIType.None`. The button needs the
+party relic (`RELIC_PARTY` collected and not sealed), same rule as `CharacterSelectionPage.PartyModeEnabled`.
 The collection page gets a **Seal all** button below the **Unseal all** button of the game (postfix on
 `CollectionsPage.OnShowStart`). It seals every seen and `sealable` item and weapon, until `Config.Seals` is full.
 The pause page shows the name of the current stage at the top (postfix on `PausePage.OnShowStart`).
@@ -128,13 +135,15 @@ The source layout:
 - `RunSnapshot.cs`: capture and restore of the run setup.
 - `PauseStageName.cs`: stage name label on the pause page.
 - `GameSpeed.cs`: raises the speed limit to 5x and replaces the toggle order.
+- `RandomParty.cs`: the Random party button on the main menu.
 - `ArcanaDoubleClick.cs`: double click on an arcana card confirms it.
 - `CollectionSealAll.cs`: the Seal all button on the collection page.
 - `PowerUpDoubleClick.cs`: double click on a power-up buys it.
 - `FrameScheduler.cs`: runs an action some frames later. The loader entry point ticks it.
 - `ModLog.cs`: log sink that the loader entry point sets.
 - `Interop.cs`: every IL2CPP and Mono difference. Object identity, delegate conversion, type casts, the
-  private game fields, and `PartySizeField`. No other file holds a runtime conditional, except the
+  private game fields, `PartySizeField`, and `Popups` (the multi option popup of the game; the list type, the
+  callback type, and the empty `Nullable` of the alignment argument differ). No other file holds a runtime conditional, except the
   `#if MELONLOADER` namespace prefix blocks.
 - `Loader/MelonEntry.cs`, `Loader/BepInExEntry.cs`, `Loader/BepInExMonoEntry.cs`: entry points. Only one is compiled.
 
@@ -255,6 +264,23 @@ Paths are relative to `reference/decompiled/VampireSurvivors.Runtime/`. Line num
   button. The major page, the minor page, and the Darkana page all use this one class.
 - `VampireSurvivors.UI/SurvarotsSelectionPage.cs`: the same shape. Public `Select()` (line 986) and the same two
   flags.
+
+### Main menu and the option popup
+
+- `VampireSurvivors.UI/MainMenuPage.cs`: `_QuickStartButton` (line 52) is a `Button`. `OnShowStart` (line 254)
+  hides it below five unlocked stages and in adventure mode, and it adds `QuickStartGameController.Execute` as a
+  listener. The menu moves its buttons with `DOMove` to anchor transforms, so a clone that is a child of the
+  button follows every layout and every hide of the game.
+- `VampireSurvivors/PopupManager.cs:127`: `CreateLargeMultiOption(id, title, description, options, callback,
+  closedCallback, textIsLocalizationTerm, textAlignment, centerTicks)`. With `textIsLocalizationTerm` true it
+  runs every string through `LocalizationManager.GetTranslation`.
+- `VampireSurvivors.UI/LargeMultiOptionPopup.cs`: `Confirm()` (line 164) calls the callback with
+  `_selectedIndex`, which is 0 when the player confirms without a click. `Initialize` reads the Rewired player
+  from `MultiplayerManager`, so open the popup before the mod sets `PartySize`.
+- The IL2CPP interop call unboxes the `textAlignment` argument with `Il2CppObjectBaseToPtrNotNull`, so it needs
+  an empty `Il2CppSystem.Nullable<TextAlignmentOptions>`. A `null` throws.
+- `VampireSurvivors.UI/QuickStartGameController.cs`: `GetValidQuickCharacters()` is the model for the character
+  pool: bought characters that have character data, and the four starting characters when the pool is too small.
 
 ### Collection page
 
@@ -453,11 +479,14 @@ Notes:
    **Unseal all** and check that every seal is gone.
 6. Open the power-up page. Double click a power-up that you can pay for. Check that the coins go down by the
    price and that the rank goes up. Double click a maxed out power-up. Check that nothing changes.
-7. Read the loader log (`MelonLoader/Latest.log` or `BepInEx/LogOutput.log`). It must show no errors from `VampireSurvivorsUx`. The first recap page logs the Done button parent and layout. Use it to correct the button positions.
-8. Copy `bin/Release/BepInEx/VampireSurvivorsUx.dll` to the Steam Deck. Set the same Proton tool and launch option. Repeat tests 1-3.
-9. On macOS, install with `tools/install-loader.sh bepinex-macos`, copy
+7. On the main menu, click **Random party**. Pick a CPU behaviour. Check that the run starts with four
+   characters, that every CPU slot has the picked behaviour, and that the stage is the next one that the main
+   character has not completed.
+8. Read the loader log (`MelonLoader/Latest.log` or `BepInEx/LogOutput.log`). It must show no errors from `VampireSurvivorsUx`. The first recap page logs the Done button parent and layout. Use it to correct the button positions.
+9. Copy `bin/Release/BepInEx/VampireSurvivorsUx.dll` to the Steam Deck. Set the same Proton tool and launch option. Repeat tests 1-3.
+10. On macOS, install with `tools/install-loader.sh bepinex-macos`, copy
    `bin/Release/BepInExMono/VampireSurvivorsUx.dll` to `BepInEx/plugins/`, set the Steam launch option, and
-   repeat tests 1-7.
+   repeat tests 1-8.
 
 ## When the game updates
 

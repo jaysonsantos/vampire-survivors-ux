@@ -47,7 +47,7 @@ namespace VampireSurvivorsUx
         private const string NextStageButtonName = "QuickRetry_NextStageButton";
         private const string NextNewStageButtonName = "QuickRetry_NextNewStageButton";
         private const float ButtonGap = 12f;
-        private const float StartDelaySeconds = 1.6f;
+        internal const float StartDelaySeconds = 1.6f;
 
         public static PendingAction Pending = PendingAction.None;
         public static RunSnapshot Snapshot;
@@ -292,7 +292,7 @@ namespace VampireSurvivorsUx
                 if (next != current)
                 {
                     Snapshot.SelectedStage = next;
-                    ApplyBgmForStage(data, options, nextData);
+                    ApplyBgmForStage(data, nextData);
                 }
                 Pending = action;
                 ModLog.Info(action + " clicked. " + current + " -> " + next);
@@ -363,23 +363,25 @@ namespace VampireSurvivorsUx
         }
 
         /// <summary>
-        /// Same rule as the song panel: a locked track stays. Else the character track wins.
-        /// Else the stage track (side B when inverse is on).
+        /// Same rule as the song panel: the character track wins, else the stage track (side B when inverse is on).
+        /// The caller checks the track lock (<c>SelectedBGMSave</c>).
         /// </summary>
-        private static void ApplyBgmForStage(DataManager data, PlayerOptions options, StageData stage)
+        internal static bool TryPickBgm(DataManager data, StageData stage, CharacterType character, bool inverse,
+            out BgmType bgm)
         {
-            if (Snapshot.SelectedBGMSave || stage == null) return;
+            bgm = default(BgmType);
+            if (stage == null) return false;
 
-            BgmType bgm = stage.BGM;
+            bgm = stage.BGM;
             var sideB = stage.sideBBGM;
-            if (Snapshot.SelectedInverse && sideB != null && sideB.HasValue) bgm = sideB.Value;
+            if (inverse && sideB != null && sideB.HasValue) bgm = sideB.Value;
 
             try
             {
                 var characters = data.GetConvertedCharacterData();
-                if (characters != null && characters.ContainsKey(Snapshot.SelectedCharacter))
+                if (characters != null && characters.ContainsKey(character))
                 {
-                    var list = characters[Snapshot.SelectedCharacter];
+                    var list = characters[character];
                     if (list != null && list.Count > 0 && list[0] != null && !string.IsNullOrEmpty(list[0].bgm))
                     {
                         bgm = (BgmType)Enum.Parse(typeof(BgmType), list[0].bgm);
@@ -390,7 +392,14 @@ namespace VampireSurvivorsUx
             {
                 ModLog.Warn("Character BGM lookup failed, using stage BGM: " + e.Message);
             }
+            return true;
+        }
 
+        /// <summary>Writes the BGM of the next stage into the snapshot. A locked track stays.</summary>
+        private static void ApplyBgmForStage(DataManager data, StageData stage)
+        {
+            if (Snapshot.SelectedBGMSave) return;
+            if (!TryPickBgm(data, stage, Snapshot.SelectedCharacter, Snapshot.SelectedInverse, out BgmType bgm)) return;
             Snapshot.SelectedBGM = bgm;
             Snapshot.SelectedBGMMod = BgmModType.Normal;
         }
@@ -543,7 +552,7 @@ namespace VampireSurvivorsUx
             FrameScheduler.RunAfterSeconds(StartDelaySeconds, StartGameFromMainMenu);
         }
 
-        private static void StartGameFromMainMenu()
+        internal static void StartGameFromMainMenu()
         {
             AppStateMachine sm = AppStateMachine.Instance;
             if (sm == null)
