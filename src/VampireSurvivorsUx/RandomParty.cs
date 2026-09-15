@@ -301,8 +301,10 @@ namespace VampireSurvivorsUx
             if (popup == null) return;
             _popup = popup;
             _popupId = ObjId.Of(popup);
-            // The popup writes the ticks one frame after Show, so set the states after that frame.
-            FrameScheduler.RunAfterFrames(2, RefreshRows);
+            // FrameDelays() of the popup writes the ticks one frame after Show, and a coroutine runs after
+            // Update, so a write in the same frame is lost. The mod writes the states on two later frames.
+            FrameScheduler.RunAfterFrames(3, RefreshRows);
+            FrameScheduler.RunAfterFrames(6, RefreshRows);
         }
 
         /// <summary>Writes the label, the value, and the tick of every line from <c>Config</c>.</summary>
@@ -313,6 +315,7 @@ namespace VampireSurvivorsUx
             if (options == null) return;
             PlayerOptionsData config = options.Config;
             GameObject[] items = Priv.SpawnedOptions(_popup);
+            if (items.Length == 0) ModLog.Warn("Random party: the popup has no lines to refresh.");
             int count = Math.Min(items.Length, _rows.Count);
             for (int i = 0; i < count; i++)
             {

@@ -393,7 +393,17 @@ Facts learned in the tests:
 
 Notes for GUI automation with `cua-driver` on KDE Wayland:
 
+- **Start the daemon with `CUA_DRIVER_RS_ENABLE_WAYLAND=1`**:
+  `CUA_DRIVER_RS_ENABLE_WAYLAND=1 setsid cua-driver serve`. Without that variable the daemon uses the
+  XWayland fallback, and every capture fails with
+  `X11 error ... error_kind: Match ... request_name: Some("GetImage")`, because `GetImage` on the XWayland
+  root does not work under KWin. `cua-driver doctor` reports `Wayland+XWayland` in both cases, so it does not
+  show the problem.
 - Per-window capture and the Steam window are not available. Use a session with `capture_scope` `auto`, escalate with reason `no_window_target`, then use `get_desktop_state` and desktop-scope `click` and `press_key`. KDE asks once for the screenshot and the remote control permission.
+- `get_desktop_state` captures both monitors (4480x1440 here). The game sits in the left 2560x1440 part.
+- A desktop `click` works on the landing page, the menu buttons, and the lines of a popup. It does **not**
+  reach the Confirm button of a popup. Use `press_key` `Return` there. `Down` moves through the lines of a
+  popup to Confirm.
 - Mouse clicks work on popups, quick start, the pause menu, and the recap buttons. The Confirm button on the character page and the START button on the stage page ignore mouse clicks. Use Return there.
 - Escape on the stage page goes back to the character page and clears the party setup.
 
@@ -447,6 +457,23 @@ Facts checked on 2026-09-12 on macOS 26.6.2, Apple M4 Pro, game build `25016043`
 | 5. Pause page stage name | Pass. `Pause page: stage label added. root=View - Paused size=(1920.00, 1200.00)`. |
 | 6. Recap page buttons | Pass. `Done button parent=ButtonContainer layout=HorizontalLayoutGroup`. Three clones added. |
 | 7. Next new, party of 4 | Pass. `EX_MAZERELLA -> TOWERBRIDGE`, BGM `BGM_Bridge`, all 4 slots and `PartySize` restored, `START_GAME` fired. |
+
+## Test results (PC, 2026-09-15, BepInEx BE 788, IL2CPP, build 25016043)
+
+Random party, driven with `cua-driver` desktop scope:
+
+| Test | Result |
+| --- | --- |
+| 1. Button on the main menu | Pass. `Random party button added. quickStart=QuickStartButton height=60`. It sits above Quick start and looks like the buttons of the game. |
+| 2. CPU popup | Pass. `Aggressive` and `Defensive` with the icons and the names of the game. |
+| 3. Modifier popup | Pass. `Moongolow` as the description. Every line shows its state, and the tick matches. |
+| 4. Toggle in place | Pass. A click on `Arcanas` logs `Arcanas -> Off`, removes the tick, and the popup stays open. |
+| 5. Confirm | Pass. `stage=SINKING bgm=BGM_Water hyper=True ... slots=[BATSBATSBATS/None, FEBBRA/Aggressive, IMELDA/Aggressive, GERMANA/Aggressive]`, then `Firing START_GAME`. The run starts with the party of 4. |
+| 6. Log | Pass. No error and no warning from `VampireSurvivorsUx`. |
+
+The first build of the modifier popup showed the tick of the selected line only. `FrameDelays()` of the popup
+writes the ticks in a coroutine one frame after `Show()`, and a coroutine runs after `Update`, so the write of
+the mod in the same frame was lost. The mod now writes the states on frame 3 and frame 6.
 
 ## Test results (PC, 2026-09-13, BepInEx BE 788, IL2CPP, build 25016043)
 
