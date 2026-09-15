@@ -14,12 +14,12 @@ follows every layout move (postfix on `MainMenuPage.OnShowStart`). A click opens
 game (`PopupManager.CreateLargeMultiOption`) with `Aggressive` and `Defensive`. The choice goes to every CPU
 slot. Then the mod picks four random characters from `PlayerOptionsData.BoughtCharacters` and the next stage
 that the main character has not completed, and it opens a second popup with the run modifiers: hyper, hurry,
-arcanas, limit break, inverse, endless, random events, random level ups, power creep (golden eggs or
-survarots), and share passives. The tick of a line shows the state of that modifier, same as the tick boxes of
-the stage select page, and the text below the name shows "On", "Off", or the power creep name. A postfix on
-`SelectOption(GameObject)` toggles the line in place and gives the focus back to the line, so the popup stays
-open. Confirm writes the slots, sets `PartySize` to 4 and `PartyModeEnabled` to true, picks the BGM (after the
-inverse toggle), and fires `START_GAME`. A slot with a
+arcanas, limit break, inverse, endless, random events, random level ups, golden eggs, survarots, and share
+passives. The modifiers are **the tick boxes of the stage select page**: the mod clones every `TickBoxUI` of
+that page into a `GridLayoutGroup`, so the art, the label, and the sound are the ones of the game. The grid
+sits in the one line of the popup. Golden eggs and survarots have no tick box of their own, so the mod clones
+the hurry box for them and writes its own label. Confirm writes the slots, sets `PartySize` to 4 and
+`PartyModeEnabled` to true, picks the BGM (after the inverse toggle), and fires `START_GAME`. A slot with a
 `RewiredPlayer` keeps `AIType.None`. The button needs the party relic (`RELIC_PARTY` collected and not
 sealed), same rule as `CharacterSelectionPage.PartyModeEnabled`.
 The collection page gets a **Seal all** button below the **Unseal all** button of the game (postfix on
@@ -288,6 +288,18 @@ Paths are relative to `reference/decompiled/VampireSurvivors.Runtime/`. Line num
   `Show()`, so a mod that uses the tick as a state box must write it after that frame.
 - `LargeMultiOptionPopupItem` has public `Title`, `Description`, `Image`, `Tick`, and `SetTick(bool)`. The
   lines live in `BasePopup._spawned`.
+- `FrameDelays()` also reads `_spawned[_selectedIndex]`, so a popup with no line throws. A mod that wants a
+  panel in place of a list gives it one empty line and puts the panel in that line.
+- `VampireSurvivors.UI/TickBoxUI.cs`: `Toggle()`, `IsOn`, and `InitialSet(bool)`. `InitialSet` writes the
+  visual state and fires no event. `Toggle()` fires the `OnToggle` event, and the event of a clone still points
+  at the stage select page (`SetInverse` there reads `_selectedStage`, which is null outside that page). So the
+  mod replaces `Button.onClick` of the clone, writes the value itself, calls `InitialSet`, and plays the sound.
+- The tick box hierarchy: `HyperModeTickBox` (100x120, `TickBoxUI`, `Button`, `SelectableUI`) with the children
+  `Label` (`TextMeshProUGUI` + `Localize`) and `Box` (with `Tick` and `Cross`). The six boxes of the stage page
+  sit in `InfoPanel/Background`, about 140 apart. `StageRandomPanel` has the public properties
+  `RandomEventsTickBox` and `RandomLevelUpsTickBox`. The share passives box sits in `CoopChoicePanel`.
+- `Resources.FindObjectsOfTypeAll<StageSelectPage>()` finds the page in the main menu scene while it is not
+  active, so the mod can clone from it at any time.
 - The IL2CPP interop call unboxes the `textAlignment` argument with `Il2CppObjectBaseToPtrNotNull`, so it needs
   an empty `Il2CppSystem.Nullable<TextAlignmentOptions>`. A `null` throws.
 - `VampireSurvivors.UI/QuickStartGameController.cs`: `GetValidQuickCharacters()` is the model for the character

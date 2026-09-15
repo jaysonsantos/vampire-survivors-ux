@@ -92,6 +92,8 @@
     <Reference Include="UnityEngine.CoreModule"><HintPath>$(GameAsmPath)/UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.InputLegacyModule"><HintPath>$(GameAsmPath)/UnityEngine.InputLegacyModule.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.UI"><HintPath>$(GameAsmPath)/UnityEngine.UI.dll</HintPath><Private>false</Private></Reference>
+    <!-- TextAnchor of GridLayoutGroup.childAlignment lives here. -->
+    <Reference Include="UnityEngine.TextRenderingModule"><HintPath>$(GameAsmPath)/UnityEngine.TextRenderingModule.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Unity.TextMeshPro"><HintPath>$(GameAsmPath)/Unity.TextMeshPro.dll</HintPath><Private>false</Private></Reference>
   </ItemGroup>
 

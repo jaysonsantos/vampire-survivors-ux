@@ -9,6 +9,7 @@ using Il2CppI2.Loc;
 using Il2CppTMPro;
 using Il2CppVampireSurvivors;
 using Il2CppVampireSurvivors.App.Scripts.Framework.Adventures;
+using Il2CppVampireSurvivors.App.Scripts.UI;
 using Il2CppVampireSurvivors.Data;
 using Il2CppVampireSurvivors.Data.Stage;
 using Il2CppVampireSurvivors.Framework;
@@ -22,6 +23,7 @@ using I2.Loc;
 using TMPro;
 using VampireSurvivors;
 using VampireSurvivors.App.Scripts.Framework.Adventures;
+using VampireSurvivors.App.Scripts.UI;
 using VampireSurvivors.Data;
 using VampireSurvivors.Data.Stage;
 using VampireSurvivors.Framework;
@@ -44,6 +46,13 @@ namespace VampireSurvivorsUx
         private const int SlotCount = 4;
         private const float ButtonGap = 12f;
 
+        // A tick box of the game is 100x120, and its label is 137 wide. The stage select page puts the boxes
+        // about 140 apart. Four of them fit in the width of the popup.
+        private const int GridColumns = 4;
+        private const float CellWidth = 140f;
+        private const float CellHeight = 124f;
+        private const float CellSpacing = 8f;
+
         private static readonly System.Random Rng = new System.Random();
 
         /// <summary>The time of the last main menu show. The start waits for the pixelate tween of the menu.</summary>
@@ -58,11 +67,12 @@ namespace VampireSurvivorsUx
         // The open modifier popup. A click on a line toggles that line in place.
         private static LargeMultiOptionPopup _popup;
         private static ObjId _popupId;
+        private static readonly Dictionary<Row, TickBoxUI> Boxes = new Dictionary<Row, TickBoxUI>();
 
         /// <summary>Every popup needs its own id, because the mod opens the next one before the old one closes.</summary>
         private static int _popupSerial;
 
-        /// <summary>One line of the modifier popup. Every line is a modifier, and Confirm starts the run.</summary>
+        /// <summary>One modifier of the run. Every one is a tick box in the popup.</summary>
         private enum Row
         {
             Hyper,
@@ -74,7 +84,8 @@ namespace VampireSurvivorsUx
             RandomEvents,
             RandomLevels,
             SharePassives,
-            PowerCreep,
+            GoldenEggs,
+            Survarots,
         }
 
         // ---------------------------------------------------------------- button
@@ -281,79 +292,225 @@ namespace VampireSurvivorsUx
         // ---------------------------------------------------------------- modifier popup
 
         /// <summary>
-        /// Shows the run modifiers. The tick of a line shows the state of that modifier, same as the tick boxes
-        /// of the stage select page. A click on a line toggles it. Confirm starts the run.
+        /// Shows the run modifiers as the tick boxes of the stage select page. The mod clones every tick box of
+        /// that page, so the art, the label, and the sound are the ones of the game. Confirm starts the run.
         /// </summary>
         private static void ShowModifiers(PlayerOptions options, DataManager data)
         {
             PlayerOptionsData config = options.Config;
             _rows = BuildRows(config, _stage);
-            var labels = new string[_rows.Count];
-            var values = new string[_rows.Count];
-            for (int i = 0; i < _rows.Count; i++)
-            {
-                labels[i] = RowLabel(_rows[i]);
-                values[i] = RowValue(config, _rows[i]);
-            }
+            Boxes.Clear();
             string stageName = StageName(data, _stage);
+            // One line of the popup hosts the tick boxes. The popup needs at least one line, because its own
+            // animation reads the selected line.
             LargeMultiOptionPopup popup = Popups.ShowOptions(NextPopupId(), "Random party", stageName,
-                labels, values, null, OnConfirmed, OnCancelled);
+                new[] { string.Empty }, new[] { string.Empty }, null, OnConfirmed, OnCancelled);
             if (popup == null) return;
             _popup = popup;
             _popupId = ObjId.Of(popup);
-            // FrameDelays() of the popup writes the ticks one frame after Show, and a coroutine runs after
-            // Update, so a write in the same frame is lost. The mod writes the states on two later frames.
-            FrameScheduler.RunAfterFrames(3, RefreshRows);
-            FrameScheduler.RunAfterFrames(6, RefreshRows);
+            // The popup builds its lines in a coroutine, so fill the host one frame later.
+            FrameScheduler.RunAfterFrames(2, () => BuildTickBoxes(config));
         }
 
-        /// <summary>Writes the label, the value, and the tick of every line from <c>Config</c>.</summary>
-        private static void RefreshRows()
+        private static void BuildTickBoxes(PlayerOptionsData config)
         {
-            if (_popup == null || _rows == null) return;
-            PlayerOptions options = SystemPlatform.Instance?.PlayerOptions;
-            if (options == null) return;
-            PlayerOptionsData config = options.Config;
-            GameObject[] items = Priv.SpawnedOptions(_popup);
-            if (items.Length == 0) ModLog.Warn("Random party: the popup has no lines to refresh.");
-            int count = Math.Min(items.Length, _rows.Count);
-            for (int i = 0; i < count; i++)
+            try
             {
-                var item = items[i] != null ? items[i].GetComponent<LargeMultiOptionPopupItem>() : null;
-                if (item == null) continue;
-                if (item.Title != null) item.Title.text = RowLabel(_rows[i]);
-                if (item.Description != null) item.Description.text = RowValue(config, _rows[i]);
-                item.SetTick(RowIsOn(config, _rows[i]));
+                if (_popup == null || _rows == null) return;
+                GameObject[] items = Priv.SpawnedOptions(_popup);
+                if (items.Length == 0)
+                {
+                    ModLog.Warn("Random party: the popup has no line to host the tick boxes.");
+                    return;
+                }
+                var pages = Resources.FindObjectsOfTypeAll<StageSelectPage>();
+                if (pages == null || pages.Length == 0)
+                {
+                    ModLog.Warn("Random party: no StageSelectPage found. No tick boxes.");
+                    return;
+                }
+                StageSelectPage page = pages[0];
+                TickBoxUI[] stageBoxes = Priv.StageTickBoxes(page);
+                StageRandomPanel randomPanel = Priv.RandomPanel(page);
+
+                // The host is one line of the popup. Clear its texts and its own click.
+                GameObject host = items[0];
+                var item = host.GetComponent<LargeMultiOptionPopupItem>();
+                if (item != null)
+                {
+                    if (item.Title != null) item.Title.text = string.Empty;
+                    if (item.Description != null) item.Description.text = string.Empty;
+                    item.SetTick(false);
+                }
+                var hostButton = host.GetComponent<Button>();
+                if (hostButton != null) hostButton.onClick = new Button.ButtonClickedEvent();
+
+                int columns = Math.Min(_rows.Count, GridColumns);
+                int lines = (_rows.Count + GridColumns - 1) / GridColumns;
+                float height = lines * (CellHeight + CellSpacing) + CellSpacing;
+                var hostRect = host.GetComponent<RectTransform>();
+                var hostLayout = host.GetComponent<LayoutElement>();
+                if (hostLayout != null)
+                {
+                    hostLayout.preferredHeight = height;
+                    hostLayout.minHeight = height;
+                }
+                if (hostRect != null) hostRect.sizeDelta = new Vector2(hostRect.sizeDelta.x, height);
+                ModLog.Info("Random party: tick box host=" + host.name + " layoutElement=" + (hostLayout != null)
+                    + " height=" + height + " lines=" + lines + " boxes=" + _rows.Count);
+
+                var grid = new GameObject("VampireSurvivorsUx_Modifiers");
+                grid.layer = host.layer;
+                var gridRect = grid.AddComponent<RectTransform>();
+                gridRect.SetParent(host.transform, false);
+                gridRect.anchorMin = Vector2.zero;
+                gridRect.anchorMax = Vector2.one;
+                gridRect.offsetMin = Vector2.zero;
+                gridRect.offsetMax = Vector2.zero;
+                var layout = grid.AddComponent<GridLayoutGroup>();
+                layout.cellSize = new Vector2(CellWidth, CellHeight);
+                layout.spacing = new Vector2(CellSpacing, CellSpacing);
+                layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+                layout.constraintCount = columns;
+                layout.childAlignment = TextAnchor.MiddleCenter;
+
+                for (int i = 0; i < _rows.Count; i++)
+                {
+                    Row row = _rows[i];
+                    TickBoxUI template = TemplateFor(row, stageBoxes, randomPanel);
+                    if (template == null)
+                    {
+                        ModLog.Warn("Random party: no tick box template for " + row + ".");
+                        continue;
+                    }
+                    AddTickBox(grid.transform, template, row, config);
+                }
+            }
+            catch (Exception e)
+            {
+                ModLog.Error("Random party: the tick boxes failed", e);
+            }
+        }
+
+        /// <summary>The tick box of the game that matches the modifier.</summary>
+        private static TickBoxUI TemplateFor(Row row, TickBoxUI[] stageBoxes, StageRandomPanel randomPanel)
+        {
+            switch (row)
+            {
+                case Row.Hyper: return At(stageBoxes, 0);
+                case Row.Hurry: return At(stageBoxes, 1);
+                case Row.Arcanas: return At(stageBoxes, 2);
+                case Row.LimitBreak: return At(stageBoxes, 3);
+                case Row.Inverse: return At(stageBoxes, 4);
+                case Row.Endless: return At(stageBoxes, 5);
+                case Row.SharePassives: return At(stageBoxes, 6);
+                case Row.RandomEvents: return randomPanel != null ? randomPanel.RandomEventsTickBox : null;
+                case Row.RandomLevels: return randomPanel != null ? randomPanel.RandomLevelUpsTickBox : null;
+                // The power creep of the character page is a three way selector, not a tick box. The mod uses
+                // one tick box of the stage page for each of the two values, with its own label.
+                case Row.GoldenEggs: return At(stageBoxes, 1);
+                case Row.Survarots: return At(stageBoxes, 1);
+                default: return null;
+            }
+        }
+
+        private static TickBoxUI At(TickBoxUI[] boxes, int index)
+            => boxes != null && index < boxes.Length ? boxes[index] : null;
+
+        private static void AddTickBox(Transform parent, TickBoxUI template, Row row, PlayerOptionsData config)
+        {
+            GameObject clone = UnityEngine.Object.Instantiate(template.gameObject, parent, false);
+            clone.name = "VampireSurvivorsUx_" + row;
+            clone.SetActive(true);
+            clone.transform.localScale = Vector3.one;
+
+            TickBoxUI box = clone.GetComponent<TickBoxUI>();
+            if (box == null)
+            {
+                ModLog.Warn("Random party: the clone of " + row + " has no TickBoxUI.");
+                UnityEngine.Object.Destroy(clone);
+                return;
+            }
+            box.InitialSet(GetBool(config, row));
+
+            string label = LabelOverride(row);
+            if (label != null)
+            {
+                var localize = clone.GetComponentInChildren<Localize>(true);
+                if (localize != null) localize.enabled = false;
+                var text = clone.GetComponentInChildren<TextMeshProUGUI>(true);
+                if (text != null) text.text = label;
+            }
+
+            var selectableUi = clone.GetComponent<SelectableUI>();
+            if (selectableUi != null)
+            {
+                selectableUi.IsDefaultSelectedOnPage = false;
+                selectableUi.ReselectIfDefaultSelectedOnPage = false;
+            }
+
+            // The click of the prefab calls Toggle(), and Toggle fires the OnToggle event of the stage select
+            // page. That page has no selected stage here, so the mod replaces the click and writes the value.
+            Button button = clone.GetComponent<Button>();
+            if (button != null)
+            {
+                button.onClick = new Button.ButtonClickedEvent();
+                button.onClick.AddListener(Interop.ToUnityAction(() => OnTickBoxClicked(row, box)));
+                Navigation navigation = button.navigation;
+                navigation.mode = Navigation.Mode.Automatic;
+                button.navigation = navigation;
+            }
+            Boxes[row] = box;
+        }
+
+        /// <summary>Every other line keeps the localized label of the game.</summary>
+        private static string LabelOverride(Row row)
+        {
+            switch (row)
+            {
+                case Row.GoldenEggs: return "Golden eggs";
+                case Row.Survarots: return "Survarots";
+                default: return null;
+            }
+        }
+
+        private static void OnTickBoxClicked(Row row, TickBoxUI box)
+        {
+            try
+            {
+                PlayerOptions options = SystemPlatform.Instance?.PlayerOptions;
+                if (options == null) return;
+                PlayerOptionsData config = options.Config;
+                bool value = !GetBool(config, row);
+                SetBool(config, row, value);
+                box.InitialSet(value);
+                // Golden eggs and survarots cannot run together, same rule as the character page.
+                if (value && (row == Row.GoldenEggs || row == Row.Survarots))
+                {
+                    Row other = row == Row.GoldenEggs ? Row.Survarots : Row.GoldenEggs;
+                    if (GetBool(config, other))
+                    {
+                        SetBool(config, other, false);
+                        TickBoxUI otherBox;
+                        if (Boxes.TryGetValue(other, out otherBox) && otherBox != null) otherBox.InitialSet(false);
+                    }
+                }
+                SoundManager.PlaySound(value ? SfxType.ClickIn : SfxType.ClickOut);
+                ModLog.Info("Random party: " + row + " -> " + (value ? "On" : "Off"));
+            }
+            catch (Exception e)
+            {
+                ModLog.Error("Random party: the tick box click failed", e);
             }
         }
 
         /// <summary>
-        /// A click on a line of the modifier popup. The game selects the line and moves the focus to Confirm.
-        /// The mod toggles the modifier instead and gives the focus back to the line.
-        /// Returns true when the popup is the modifier popup of the mod.
+        /// A click on the line that hosts the tick boxes. The mod swallows it, so the double click rule of the
+        /// popup does not confirm the run. Returns true when the popup is the modifier popup of the mod.
         /// </summary>
         public static bool HandleOptionSelected(LargeMultiOptionPopup popup)
         {
-            if (_popup == null || _rows == null || !ObjId.Of(popup).Same(_popupId)) return false;
-            PlayerOptions options = SystemPlatform.Instance?.PlayerOptions;
-            if (options == null) return true;
-            int index = Priv.SelectedIndex(popup);
-            if (index < 0 || index >= _rows.Count) return true;
-
-            PlayerOptionsData config = options.Config;
-            Row row = _rows[index];
-            if (row == Row.PowerCreep) CyclePowerCreep(config);
-            else SetBool(config, row, !GetBool(config, row));
-            ModLog.Info("Random party: " + RowLabel(row) + " -> " + RowValue(config, row));
-            RefreshRows();
-
-            GameObject[] items = Priv.SpawnedOptions(popup);
-            if (index < items.Length && items[index] != null)
-            {
-                var selectable = items[index].GetComponent<Selectable>();
-                if (selectable != null) selectable.Select();
-            }
-            return true;
+            return _popup != null && _rows != null && ObjId.Of(popup).Same(_popupId);
         }
 
         private static List<Row> BuildRows(PlayerOptionsData config, StageType stage)
@@ -370,8 +527,9 @@ namespace VampireSurvivorsUx
             if (config.HasCollectedItem(ItemType.RELIC_TRUMPET)) rows.Add(Row.Endless);
             if (config.HasCollectedItem(ItemType.RELIC_TRISECTION)) rows.Add(Row.RandomEvents);
             if (config.HasCollectedItem(ItemType.RELIC_BRAVESTORY)) rows.Add(Row.RandomLevels);
-            if (HasEggs(config) || HasSurvarots(config)) rows.Add(Row.PowerCreep);
             rows.Add(Row.SharePassives);
+            if (HasEggs(config)) rows.Add(Row.GoldenEggs);
+            if (HasSurvarots(config)) rows.Add(Row.Survarots);
             return rows;
         }
 
@@ -380,43 +538,6 @@ namespace VampireSurvivorsUx
 
         private static bool HasSurvarots(PlayerOptionsData config)
             => config.HasCollectedItem(ItemType.RELIC_SURVAROCCHI);
-
-        private static string RowLabel(Row row)
-        {
-            switch (row)
-            {
-                case Row.Hyper: return "Hyper";
-                case Row.Hurry: return "Hurry";
-                case Row.Arcanas: return "Arcanas";
-                case Row.LimitBreak: return "Limit break";
-                case Row.Inverse: return "Inverse";
-                case Row.Endless: return "Endless";
-                case Row.RandomEvents: return "Random events";
-                case Row.RandomLevels: return "Random level ups";
-                case Row.SharePassives: return "Share passives";
-                case Row.PowerCreep: return "Power creep";
-                default: return row.ToString();
-            }
-        }
-
-        private static string RowValue(PlayerOptionsData config, Row row)
-        {
-            switch (row)
-            {
-                case Row.PowerCreep:
-                    if (config.SelectedGoldenEggs) return "Golden eggs";
-                    if (config.SelectedSurvarots) return "Survarots";
-                    return "Off";
-                default: return GetBool(config, row) ? "On" : "Off";
-            }
-        }
-
-        /// <summary>The tick of a line. Power creep is on when eggs or survarots are on.</summary>
-        private static bool RowIsOn(PlayerOptionsData config, Row row)
-        {
-            if (row == Row.PowerCreep) return config.SelectedGoldenEggs || config.SelectedSurvarots;
-            return GetBool(config, row);
-        }
 
         private static bool GetBool(PlayerOptionsData config, Row row)
         {
@@ -431,6 +552,8 @@ namespace VampireSurvivorsUx
                 case Row.RandomEvents: return config.SelectedRandomEvents;
                 case Row.RandomLevels: return config.SelectedRandomLevels;
                 case Row.SharePassives: return config.SelectedSharePassives;
+                case Row.GoldenEggs: return config.SelectedGoldenEggs;
+                case Row.Survarots: return config.SelectedSurvarots;
                 default: return false;
             }
         }
@@ -448,28 +571,8 @@ namespace VampireSurvivorsUx
                 case Row.RandomEvents: config.SelectedRandomEvents = value; break;
                 case Row.RandomLevels: config.SelectedRandomLevels = value; break;
                 case Row.SharePassives: config.SelectedSharePassives = value; break;
-            }
-        }
-
-        /// <summary>Power creep has three states, same as the selector of the character page.</summary>
-        private static void CyclePowerCreep(PlayerOptionsData config)
-        {
-            bool eggs = HasEggs(config);
-            bool survarots = HasSurvarots(config);
-            if (config.SelectedGoldenEggs)
-            {
-                config.SelectedGoldenEggs = false;
-                config.SelectedSurvarots = survarots;
-            }
-            else if (config.SelectedSurvarots)
-            {
-                config.SelectedGoldenEggs = false;
-                config.SelectedSurvarots = false;
-            }
-            else
-            {
-                config.SelectedGoldenEggs = eggs;
-                config.SelectedSurvarots = !eggs && survarots;
+                case Row.GoldenEggs: config.SelectedGoldenEggs = value; break;
+                case Row.Survarots: config.SelectedSurvarots = value; break;
             }
         }
 
@@ -480,6 +583,7 @@ namespace VampireSurvivorsUx
             {
                 _popup = null;
                 _popupId = ObjId.None;
+                Boxes.Clear();
                 PlayerOptions options = SystemPlatform.Instance?.PlayerOptions;
                 DataManager data = SystemPlatform.Instance?.DataManager;
                 if (options == null || data == null)
@@ -498,6 +602,7 @@ namespace VampireSurvivorsUx
         private static void OnCancelled()
         {
             ModLog.Info("Random party: cancelled.");
+            Boxes.Clear();
             _popup = null;
             _popupId = ObjId.None;
             _rows = null;

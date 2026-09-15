@@ -13,6 +13,7 @@ using System.Reflection;
 // MelonLoader generates the interop assemblies with the Il2Cpp namespace prefix.
 using Il2CppTMPro;
 using Il2CppVampireSurvivors;
+using Il2CppVampireSurvivors.App.Scripts.UI;
 using Il2CppVampireSurvivors.App.UI;
 using Il2CppVampireSurvivors.Framework;
 using Il2CppVampireSurvivors.Framework.Speedup;
@@ -22,6 +23,7 @@ using Il2CppVampireSurvivors.UI;
 // The BepInEx interop assemblies and the Mono game assemblies have no namespace prefix.
 using TMPro;
 using VampireSurvivors;
+using VampireSurvivors.App.Scripts.UI;
 using VampireSurvivors.App.UI;
 using VampireSurvivors.Framework;
 using VampireSurvivors.Framework.Speedup;
@@ -98,6 +100,22 @@ namespace VampireSurvivorsUx
             return items;
         }
 
+        public static RectTransform InfoPanel(StageSelectPage page) => page._InfoPanel;
+
+        public static StageRandomPanel RandomPanel(StageSelectPage page) => page._StageRandomPanel;
+
+        public static GameObject SharePassivesPanel(StageSelectPage page) => page._SharePassivesPanel;
+
+        public static TickBoxUI[] StageTickBoxes(StageSelectPage page) => new[]
+        {
+            page._HyperModeTickBox, page._HurryModeTickBox, page._MazzoModeTickBox,
+            page._LimitBreakTickBox, page._InverseModeTickBox, page._EndlessModeTickBox,
+            page._SharePassivesBox,
+        };
+
+        /// <summary>Drops the listeners of the prefab, which point at the stage select page.</summary>
+        public static void ResetToggleEvent(TickBoxUI tickBox) => tickBox.OnToggle = new UnityEngine.Events.UnityEvent<bool>();
+
         public static RectTransform ResumeButton(PausePage page) => page._ResumeButton;
 
         public static GameObject FastForwardIcon1(FastForwardButton button) => button._icon1;
@@ -132,6 +150,32 @@ namespace VampireSurvivorsUx
         {
             var list = Read<System.Collections.Generic.List<GameObject>>(popup, "_spawned");
             return list != null ? list.ToArray() : new GameObject[0];
+        }
+
+        public static RectTransform InfoPanel(StageSelectPage page) => Read<RectTransform>(page, "_InfoPanel");
+
+        public static StageRandomPanel RandomPanel(StageSelectPage page) => Read<StageRandomPanel>(page, "_StageRandomPanel");
+
+        public static GameObject SharePassivesPanel(StageSelectPage page) => Read<GameObject>(page, "_SharePassivesPanel");
+
+        public static TickBoxUI[] StageTickBoxes(StageSelectPage page) => new[]
+        {
+            Read<TickBoxUI>(page, "_HyperModeTickBox"), Read<TickBoxUI>(page, "_HurryModeTickBox"),
+            Read<TickBoxUI>(page, "_MazzoModeTickBox"), Read<TickBoxUI>(page, "_LimitBreakTickBox"),
+            Read<TickBoxUI>(page, "_InverseModeTickBox"), Read<TickBoxUI>(page, "_EndlessModeTickBox"),
+            Read<TickBoxUI>(page, "_SharePassivesBox"),
+        };
+
+        /// <summary>Drops the listeners of the prefab, which point at the stage select page.</summary>
+        public static void ResetToggleEvent(TickBoxUI tickBox)
+        {
+            FieldInfo field = Find(tickBox.GetType(), "OnToggle");
+            if (field == null)
+            {
+                ModLog.Warn("Field OnToggle not found on TickBoxUI.");
+                return;
+            }
+            field.SetValue(tickBox, new UnityEngine.Events.UnityEvent<bool>());
         }
 
         public static RectTransform ResumeButton(PausePage page) => Read<RectTransform>(page, "_ResumeButton");

@@ -21,9 +21,9 @@ The mod also adds double click to the menus:
 On the main menu, the mod adds a **Random party** button above **Quick start**. It asks one time for the CPU
 behaviour (aggressive or defensive) and gives that behaviour to every CPU slot. Then it shows the run
 modifiers of the stage: hyper, hurry, arcanas, limit break, inverse, endless, random events, random level ups,
-power creep (golden eggs or survarots), and share passives. The list shows only the modifiers that you have
-unlocked. A tick marks every modifier that is on, same as the tick boxes of the stage page. A click on a line
-changes that modifier, and **Confirm** starts the run. The mod fills the four local slots with random bought characters and uses the next stage that
+golden eggs, survarots, and share passives. They are the tick boxes of the stage page, with the same art and
+the same labels, and only the modifiers that you have unlocked appear. A click on a box changes that modifier,
+and **Confirm** starts the run. The mod fills the four local slots with random bought characters and uses the next stage that
 the main character has not completed yet. A slot with a controller keeps its player. The button needs the
 party relic, same as the party mode of the game.
 
