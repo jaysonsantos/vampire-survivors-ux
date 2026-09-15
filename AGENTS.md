@@ -12,10 +12,15 @@ In the party size and CPU type popups (`LargeMultiOptionPopup`), a second click 
 The main menu gets a **Random party** button, a clone of the Quick start button and a child of it, so it
 follows every layout move (postfix on `MainMenuPage.OnShowStart`). A click opens the multi option popup of the
 game (`PopupManager.CreateLargeMultiOption`) with `Aggressive` and `Defensive`. The choice goes to every CPU
-slot. The mod then picks four random characters from `PlayerOptionsData.BoughtCharacters`, writes the slots,
-sets `PartySize` to 4 and `PartyModeEnabled` to true, selects the next stage that the main character has not
-completed, and fires `START_GAME`. A slot with a `RewiredPlayer` keeps `AIType.None`. The button needs the
-party relic (`RELIC_PARTY` collected and not sealed), same rule as `CharacterSelectionPage.PartyModeEnabled`.
+slot. Then the mod picks four random characters from `PlayerOptionsData.BoughtCharacters` and the next stage
+that the main character has not completed, and it opens a second popup with the run modifiers: hyper, hurry,
+arcanas, limit break, inverse, endless, random events, random level ups, power creep (golden eggs or
+survarots), and share passives. Every line shows the state ("On", "Off", or the power creep name). A pick
+writes the value into `Config` and opens the popup again at the same line, because the popup of the game has
+one confirm for one line. The first line, **Start run**, writes the slots, sets `PartySize` to 4 and
+`PartyModeEnabled` to true, picks the BGM (after the inverse toggle), and fires `START_GAME`. A slot with a
+`RewiredPlayer` keeps `AIType.None`. The button needs the party relic (`RELIC_PARTY` collected and not
+sealed), same rule as `CharacterSelectionPage.PartyModeEnabled`.
 The collection page gets a **Seal all** button below the **Unseal all** button of the game (postfix on
 `CollectionsPage.OnShowStart`). It seals every seen and `sealable` item and weapon, until `Config.Seals` is full.
 The pause page shows the name of the current stage at the top (postfix on `PausePage.OnShowStart`).
@@ -281,6 +286,17 @@ Paths are relative to `reference/decompiled/VampireSurvivors.Runtime/`. Line num
   an empty `Il2CppSystem.Nullable<TextAlignmentOptions>`. A `null` throws.
 - `VampireSurvivors.UI/QuickStartGameController.cs`: `GetValidQuickCharacters()` is the model for the character
   pool: bought characters that have character data, and the four starting characters when the pool is too small.
+- `PopupManager.ClosePopup(id)` destroys the fader when the last popup closes. `Confirm()` runs the callback
+  before `ClosePopup`, so a new popup that opens inside the callback keeps the fader. It needs a new id,
+  because `_popups` still holds the old one.
+- The relic of every modifier: hurry `RELIC_TEAR`, arcanas `RELIC_RANDOMAZZO` or `RELIC_DARKASSO`, limit break
+  `RELIC_GGOSPEL`, inverse `RELIC_MIRROR`, endless `RELIC_TRUMPET`, random events `RELIC_TRISECTION`, random
+  level ups `RELIC_BRAVESTORY`, golden eggs `RELIC_GOLDENEGG` (not in adventure mode), survarots
+  `RELIC_SURVAROCCHI`. Hyper needs the stage in `PlayerOptionsData.UnlockedHypers`;
+  `StageSelectPage.ToggleHyper` clamps `SelectedHyper` with that rule, so the mod repeats the clamp.
+  `StageSelectPage` sets the first seven (line 355 and line 444). `StageRandomPanel` sets the two random ones.
+  `PowerCreepSelectorUI` (line 100) sets the golden eggs and the survarots, which are one three-state option.
+  `SelectedMaxWeapons` comes from the equipment panel and is not part of the popup.
 
 ### Collection page
 
@@ -479,9 +495,10 @@ Notes:
    **Unseal all** and check that every seal is gone.
 6. Open the power-up page. Double click a power-up that you can pay for. Check that the coins go down by the
    price and that the rank goes up. Double click a maxed out power-up. Check that nothing changes.
-7. On the main menu, click **Random party**. Pick a CPU behaviour. Check that the run starts with four
-   characters, that every CPU slot has the picked behaviour, and that the stage is the next one that the main
-   character has not completed.
+7. On the main menu, click **Random party**. Pick a CPU behaviour. Change some modifiers in the second popup
+   and check that every line shows the new state. Click **Start run**. Check that the run starts with four
+   characters, that every CPU slot has the picked behaviour, that the stage is the next one that the main
+   character has not completed, and that the modifiers of the run match the popup.
 8. Read the loader log (`MelonLoader/Latest.log` or `BepInEx/LogOutput.log`). It must show no errors from `VampireSurvivorsUx`. The first recap page logs the Done button parent and layout. Use it to correct the button positions.
 9. Copy `bin/Release/BepInEx/VampireSurvivorsUx.dll` to the Steam Deck. Set the same Proton tool and launch option. Repeat tests 1-3.
 10. On macOS, install with `tools/install-loader.sh bepinex-macos`, copy

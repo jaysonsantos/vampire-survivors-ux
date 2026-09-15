@@ -191,36 +191,49 @@ namespace VampireSurvivorsUx
     }
 
     /// <summary>
-    /// The multi option popup of the game. The list type and the callback type differ between the runtimes.
+    /// The multi option popup of the game. The list type, the callback types, and the alignment argument differ
+    /// between the runtimes.
     /// </summary>
     internal static class Popups
     {
-        /// <summary>Keeps the managed callback alive while the popup is open.</summary>
-        private static Action<int> _callback;
+        // The popup holds the native callbacks only. These fields keep the managed ones alive.
+        private static Action<int> _onPick;
+        private static Action _onClosed;
 
-        public static void ShowOptions(string id, string title, string[] labels, Sprite[] icons, Action<int> onPick)
+        /// <summary>
+        /// Opens the popup. <paramref name="labels"/> is the title of every line, <paramref name="values"/> the
+        /// text below it. The strings are not localization terms.
+        /// </summary>
+        public static LargeMultiOptionPopup ShowOptions(string id, string title, string description,
+            string[] labels, string[] values, Sprite[] icons, Action<int> onPick, Action onClosed)
         {
-            _callback = onPick;
+            _onPick = onPick;
+            _onClosed = onClosed;
 #if IL2CPP
             var options = new Il2CppSystem.Collections.Generic.List<OptionDataSet>();
             for (int i = 0; i < labels.Length; i++)
             {
-                options.Add(new OptionDataSet(labels[i], string.Empty, icons != null ? icons[i] : null));
+                options.Add(new OptionDataSet(labels[i], values != null ? values[i] : string.Empty,
+                    icons != null ? icons[i] : null));
             }
-            var callback = DelegateSupport.ConvertDelegate<Il2CppSystem.Action<int>>(_callback);
+            var pick = DelegateSupport.ConvertDelegate<Il2CppSystem.Action<int>>(_onPick);
+            var closed = _onClosed != null ? DelegateSupport.ConvertDelegate<Il2CppSystem.Action>(_onClosed) : null;
             // The interop call unboxes the alignment argument, so it needs a real empty Nullable, not null.
             var alignment = new Il2CppSystem.Nullable<TextAlignmentOptions>();
 #else
             var options = new System.Collections.Generic.List<OptionDataSet>();
             for (int i = 0; i < labels.Length; i++)
             {
-                options.Add(new OptionDataSet(labels[i], string.Empty, icons != null ? icons[i] : null));
+                options.Add(new OptionDataSet(labels[i], values != null ? values[i] : string.Empty,
+                    icons != null ? icons[i] : null));
             }
-            Action<int> callback = _callback;
+            Action<int> pick = _onPick;
+            Action closed = _onClosed;
             TextAlignmentOptions? alignment = null;
 #endif
-            // The labels are already translated, so the popup must not translate them again.
-            PopupManager.CreateLargeMultiOption(id, title, string.Empty, options, callback, null, false, alignment, true);
+            // The strings are already in the language of the player, so the popup must not translate them.
+            return PopupManager.CreateLargeMultiOption(id, title, description, options, pick, closed, false,
+                alignment, true);
         }
     }
 

@@ -19,10 +19,13 @@ The mod also adds double click to the menus:
   at the maximum rank does not change.
 
 On the main menu, the mod adds a **Random party** button above **Quick start**. It asks one time for the CPU
-behaviour (aggressive or defensive) and gives that behaviour to every CPU slot. Then it fills the four local
-slots with random bought characters and starts a run on the next stage that the main character has not
-completed yet. A slot with a controller keeps its player. The button needs the party relic, same as the party
-mode of the game.
+behaviour (aggressive or defensive) and gives that behaviour to every CPU slot. Then it shows the run
+modifiers of the stage: hyper, hurry, arcanas, limit break, inverse, endless, random events, random level ups,
+power creep (golden eggs or survarots), and share passives. The list shows only the modifiers that you have
+unlocked, with the state of every one. A click on a line changes that state, and a click on **Start run**
+starts the run. The mod fills the four local slots with random bought characters and uses the next stage that
+the main character has not completed yet. A slot with a controller keeps its player. The button needs the
+party relic, same as the party mode of the game.
 
 On the collection page, the mod adds a **Seal all** button below **Unseal all**. It seals every item and weapon
 that a click can seal, until the seal limit is full. The rules of the game do not change: an item must be found
