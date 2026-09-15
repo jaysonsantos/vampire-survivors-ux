@@ -252,7 +252,9 @@ Paths are relative to `reference/decompiled/VampireSurvivors.Runtime/`. Line num
 - `VampireSurvivors.App.UI/FastForwardButton.cs`: the on-screen button. `FastForward()` (line 92) is the second
   input path and needs the same order. `CheckTimescale()` (line 72) picks one of three icons: `_icon1` below
   1.5x, `_icon2` below 2x, `_icon3` from 2x up. `Update()` (line 48) hides all three icons when the run blocks
-  the speed-up.
+  the speed-up. **With the whole stops of the mod, `_icon2` is never the choice of the game and 2x shows three
+  arrows**, so the postfix of the mod on `Update` writes the three icons itself. `Update` calls
+  `CheckTimescale` only when `Time.timeScale` changed, so the postfix must write the state every frame.
 - The three icons are children of `Button - Fast Forward`, all 100x100 and stacked at the same place
   (`anchoredPosition` `(-50, -50)`). The sprites are `fastForward` (one arrow), `fastForwardX2` (two arrows),
   and `fastForwardX3` (three arrows). The arrows fill about 70 of the 100 units.
@@ -379,11 +381,13 @@ This design is implemented in `src/VampireSurvivorsUx/`.
 - Speed stops: 1x, 2x, 3x, 4x, 5x. Whole steps, five presses per full cycle. The 1.5x stop of the game is gone.
 - Speed rules: the mod keeps every rule of the game. The Speed-Up relic is still necessary, a banned stage still
   blocks the speed-up, and online runs still block it. The mod only raises the limit and changes the order.
-- Speed indicator: the game has one icon for every speed from 2x up, so 2x to 5x would look the same. The mod
-  keeps the icons of the game for the first three speeds and adds the missing arrows with the art of the game:
-  4x is the three arrow icon plus the one arrow icon, 5x is the three arrow icon plus the two arrow icon. The
-  extra icon sits 70 units to the right, so the arrows read as one row. It follows `_icon3`, so every rule that
-  hides the button hides it too.
+- Speed indicator: one arrow for every speed. `CheckTimescale` of the game picks `_icon2` below 2x and
+  `_icon3` from 2x up, so with whole stops it never shows two arrows and 2x to 5x look the same. The mod
+  writes the three icons itself: 1x `_icon1`, 2x `_icon2`, 3x and up `_icon3`. For 4x and 5x it adds the
+  missing arrows with the art of the game: 4x is the three arrow icon plus the one arrow icon, 5x is the three
+  arrow icon plus the two arrow icon. The extra icon sits 70 units to the right, so the arrows read as one
+  row. The mod writes nothing while all three icons of the game are off, so every rule that hides the button
+  hides the arrows too.
 
 ## Test results (PC, 2026-09-10, BepInEx BE 788, build 25016043)
 

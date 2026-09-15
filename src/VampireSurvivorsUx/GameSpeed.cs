@@ -122,10 +122,11 @@ namespace VampireSurvivorsUx
 
         /// <summary>
         /// The button has three stacked icons: one arrow (<c>fastForward</c>), two arrows
-        /// (<c>fastForwardX2</c>), and three arrows (<c>fastForwardX3</c>). The game shows the third one for
-        /// every speed from 2x up, so 4x and 5x look the same as 3x. This adds one or two more arrows to the
-        /// right of the button. The first three speeds keep the icons of the game.
-        /// The arrows follow the third icon, so every rule that hides the button hides them too.
+        /// (<c>fastForwardX2</c>), and three arrows (<c>fastForwardX3</c>). <c>CheckTimescale</c> of the game
+        /// picks the second one below 2x and the third one from 2x up, so with whole stops 2x showed three
+        /// arrows and 4x and 5x looked the same as 3x. This picks one icon for every stop and adds one or two
+        /// more arrows to the right of the button for 4x and 5x.
+        /// The arrows follow the icons of the game, so every rule that hides the button hides them too.
         /// </summary>
         [HarmonyPatch(typeof(FastForwardButton), "Update")]
         private static class FastForwardButton_Update_Patch
@@ -151,25 +152,40 @@ namespace VampireSurvivorsUx
         private static GameObject _extra;
         private static UnityEngine.UI.Image _extraImage;
 
+        /// <summary>The stops are whole numbers, so a compare needs a small margin.</summary>
+        private const float Epsilon = 0.01f;
+
         /// <summary>
-        /// Adds the missing arrows with the art of the game and at its size. 4x is the three arrow icon plus
-        /// the one arrow icon. 5x is the three arrow icon plus the two arrow icon.
+        /// One icon for every stop: 1x one arrow, 2x two arrows, 3x three arrows. 4x is the three arrow icon
+        /// plus the one arrow icon. 5x is the three arrow icon plus the two arrow icon.
         /// </summary>
         private static void UpdateArrows(FastForwardButton button)
         {
+            GameObject icon1 = Priv.FastForwardIcon1(button);
+            GameObject icon2 = Priv.FastForwardIcon2(button);
             GameObject icon3 = Priv.FastForwardIcon3(button);
-            bool iconsVisible = icon3 != null && icon3.activeInHierarchy;
-            float speed = SpeedupManager.Instance.CurrentSpeedMultiplier;
+            SpeedupManager manager = SpeedupManager.Instance;
+            if (icon1 == null || icon2 == null || icon3 == null || manager == null) return;
+            float speed = manager.CurrentSpeedMultiplier;
 
             // The button is rebuilt with every run, so drop the object of the previous run.
             if (_extra == null) _extraImage = null;
 
-            int extraArrows = 0;
-            if (iconsVisible)
+            // The game hides all three icons while the run blocks the speed-up. Keep that state.
+            bool iconsVisible = icon1.activeSelf || icon2.activeSelf || icon3.activeSelf;
+            if (!iconsVisible)
             {
-                if (speed >= 5f) extraArrows = 2;
-                else if (speed >= 4f) extraArrows = 1;
+                if (_extra != null && _extra.activeSelf) _extra.SetActive(false);
+                return;
             }
+
+            SetActive(icon1, speed < 2f - Epsilon);
+            SetActive(icon2, speed >= 2f - Epsilon && speed < 3f - Epsilon);
+            SetActive(icon3, speed >= 3f - Epsilon);
+
+            int extraArrows = 0;
+            if (speed >= 5f - Epsilon) extraArrows = 2;
+            else if (speed >= 4f - Epsilon) extraArrows = 1;
 
             if (extraArrows == 0)
             {
@@ -179,13 +195,18 @@ namespace VampireSurvivorsUx
 
             if (_extra == null && !CreateExtra(button)) return;
 
-            GameObject source = extraArrows == 2 ? Priv.FastForwardIcon2(button) : Priv.FastForwardIcon1(button);
-            var sourceImage = source != null ? source.GetComponent<UnityEngine.UI.Image>() : null;
+            GameObject source = extraArrows == 2 ? icon2 : icon1;
+            var sourceImage = source.GetComponent<UnityEngine.UI.Image>();
             if (sourceImage != null && _extraImage != null && _extraImage.sprite != sourceImage.sprite)
             {
                 _extraImage.sprite = sourceImage.sprite;
             }
             if (!_extra.activeSelf) _extra.SetActive(true);
+        }
+
+        private static void SetActive(GameObject target, bool active)
+        {
+            if (target.activeSelf != active) target.SetActive(active);
         }
 
         private static bool CreateExtra(FastForwardButton button)

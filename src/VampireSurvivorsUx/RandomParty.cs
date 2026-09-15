@@ -46,12 +46,13 @@ namespace VampireSurvivorsUx
         private const int SlotCount = 4;
         private const float ButtonGap = 12f;
 
-        // A tick box of the game is 100x120, and its label is 137 wide. The stage select page puts the boxes
-        // about 140 apart. Four of them fit in the width of the popup.
+        // A tick box of the game is 100x120 and its label is 137 wide, so a cell needs more than the box.
+        // The stage select page puts the boxes about 140 apart. Four of them fit in the width of the popup.
         private const int GridColumns = 4;
-        private const float CellWidth = 140f;
-        private const float CellHeight = 124f;
-        private const float CellSpacing = 8f;
+        private const float CellWidth = 150f;
+        private const float CellHeight = 150f;
+        private const float CellSpacing = 10f;
+        private const float HostPadding = 20f;
 
         private static readonly System.Random Rng = new System.Random();
 
@@ -347,26 +348,36 @@ namespace VampireSurvivorsUx
 
                 int columns = Math.Min(_rows.Count, GridColumns);
                 int lines = (_rows.Count + GridColumns - 1) / GridColumns;
-                float height = lines * (CellHeight + CellSpacing) + CellSpacing;
+                float gridWidth = columns * CellWidth + (columns - 1) * CellSpacing;
+                float gridHeight = lines * CellHeight + (lines - 1) * CellSpacing;
+                float height = gridHeight + HostPadding;
+
+                // The line of the popup is the grey background. Its height comes from the layout element.
                 var hostRect = host.GetComponent<RectTransform>();
                 var hostLayout = host.GetComponent<LayoutElement>();
-                if (hostLayout != null)
-                {
-                    hostLayout.preferredHeight = height;
-                    hostLayout.minHeight = height;
-                }
+                if (hostLayout == null) hostLayout = host.AddComponent<LayoutElement>();
+                hostLayout.minHeight = height;
+                hostLayout.preferredHeight = height;
+                hostLayout.flexibleHeight = 0f;
                 if (hostRect != null) hostRect.sizeDelta = new Vector2(hostRect.sizeDelta.x, height);
-                ModLog.Info("Random party: tick box host=" + host.name + " layoutElement=" + (hostLayout != null)
-                    + " height=" + height + " lines=" + lines + " boxes=" + _rows.Count);
+                var fitter = host.GetComponent<ContentSizeFitter>();
+                if (fitter != null) fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
+                ModLog.Info("Random party: tick box host=" + host.name
+                    + " parent=" + (host.transform.parent != null ? host.transform.parent.name : "null")
+                    + " parentLayout=" + LayoutNameOf(host.transform.parent)
+                    + " fitter=" + (fitter != null) + " wanted=" + height
+                    + " grid=" + gridWidth + "x" + gridHeight + " lines=" + lines + " boxes=" + _rows.Count);
 
                 var grid = new GameObject("VampireSurvivorsUx_Modifiers");
                 grid.layer = host.layer;
                 var gridRect = grid.AddComponent<RectTransform>();
                 gridRect.SetParent(host.transform, false);
-                gridRect.anchorMin = Vector2.zero;
-                gridRect.anchorMax = Vector2.one;
-                gridRect.offsetMin = Vector2.zero;
-                gridRect.offsetMax = Vector2.zero;
+                // An explicit size, so the grid does not depend on the size of the line.
+                gridRect.anchorMin = new Vector2(0.5f, 0.5f);
+                gridRect.anchorMax = new Vector2(0.5f, 0.5f);
+                gridRect.pivot = new Vector2(0.5f, 0.5f);
+                gridRect.anchoredPosition = Vector2.zero;
+                gridRect.sizeDelta = new Vector2(gridWidth, gridHeight);
                 var layout = grid.AddComponent<GridLayoutGroup>();
                 layout.cellSize = new Vector2(CellWidth, CellHeight);
                 layout.spacing = new Vector2(CellSpacing, CellSpacing);
@@ -385,11 +396,25 @@ namespace VampireSurvivorsUx
                     }
                     AddTickBox(grid.transform, template, row, config);
                 }
+
+                FrameScheduler.RunAfterFrames(2, () =>
+                {
+                    if (hostRect == null || gridRect == null) return;
+                    ModLog.Info("Random party: after layout host=" + hostRect.rect.size
+                        + " grid=" + gridRect.rect.size);
+                });
             }
             catch (Exception e)
             {
                 ModLog.Error("Random party: the tick boxes failed", e);
             }
+        }
+
+        private static string LayoutNameOf(Transform t)
+        {
+            if (t == null) return "none";
+            var layout = t.GetComponent<LayoutGroup>();
+            return layout != null ? Interop.TypeNameOf(layout) : "none";
         }
 
         /// <summary>The tick box of the game that matches the modifier.</summary>

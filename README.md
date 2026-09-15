@@ -35,8 +35,8 @@ When the game is paused, the mod shows the name of the current stage at the top 
 
 The speed limit of the game goes from 2x to 5x. The speed button steps through 1x, 2x, 3x, 4x, 5x, and back to
 1x. The rules of the game do not change: the speed-up still needs the Speed-Up relic, and it stays off on stages
-that ban it and in online runs. The game has one icon for every speed from 2x up, so the mod adds the missing
-arrows with the art of the game: 4x shows four arrows and 5x shows five.
+that ban it and in online runs. The button shows one arrow for every speed: one at 1x, two at 2x, three at 3x,
+four at 4x, and five at 5x. The extra arrows use the art of the game.
 
 The buttons do not appear in online runs and in adventures. The mod does not change game data or balance. The game still gives rewards and saves before a new run starts.
 
