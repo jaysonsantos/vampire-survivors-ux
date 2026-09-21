@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Builds the release files for every supported platform (AGENTS.md step 2).
 # Usage: tools/build-release.sh [output folder]
+# Set ONLY=il2cpp or ONLY=mono to build one file. The other build then needs no assemblies.
 # Output (default dist/):
 #   VampireSurvivorsUx.dll       Windows, Linux, and Steam Deck. BepInEx 6 on IL2CPP.
 #   VampireSurvivorsUx-mono.dll  macOS. BepInEx 5 on Mono.
@@ -13,6 +14,15 @@
 # tools/gen-interop.sh. Mono assemblies come from the macOS or Linux game folder,
 # or from a local copy in reference/managed-mono-build<BUILD>/.
 set -euo pipefail
+
+ONLY="${ONLY:-all}"
+case "$ONLY" in
+  all|il2cpp|mono) ;;
+  *)
+    echo "ONLY must be il2cpp or mono, not: $ONLY" >&2
+    exit 2
+    ;;
+esac
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="${1:-$REPO/dist}"
@@ -73,15 +83,15 @@ if [ -z "$MONO_LIB" ]; then
 fi
 
 fail=0
-if [ -z "$IL2CPP_ASM" ]; then
+if [ "$ONLY" != mono ] && [ -z "$IL2CPP_ASM" ]; then
   echo "No IL2CPP assemblies. Start the game once with BepInEx, or run tools/gen-interop.sh." >&2
   fail=1
 fi
-if [ -z "$MONO_ASM" ]; then
+if [ "$ONLY" != il2cpp ] && [ -z "$MONO_ASM" ]; then
   echo "No Mono assemblies. Copy VampireSurvivors_Data/Managed to reference/managed-mono-build<BUILD>/." >&2
   fail=1
 fi
-if [ -z "$MONO_LIB" ]; then
+if [ "$ONLY" != il2cpp ] && [ -z "$MONO_LIB" ]; then
   echo "No BepInEx 5 libraries. Run tools/install-loader.sh bepinex-macos, or unzip the loader to" >&2
   echo "reference/loaders/bepinex5/." >&2
   fail=1
@@ -90,15 +100,19 @@ fi
 
 mkdir -p "$OUT"
 
-echo "== BepInEx (IL2CPP): $IL2CPP_ASM"
-dotnet build "$PROJ" -c Release -p:Loader=BepInEx \
-  -p:GameAsmPath="$IL2CPP_ASM" -p:CopyToMods=false
-cp "$BIN/BepInEx/VampireSurvivorsUx.dll" "$OUT/VampireSurvivorsUx.dll"
+if [ "$ONLY" != mono ]; then
+  echo "== BepInEx (IL2CPP): $IL2CPP_ASM"
+  dotnet build "$PROJ" -c Release -p:Loader=BepInEx \
+    -p:GameAsmPath="$IL2CPP_ASM" -p:CopyToMods=false
+  cp "$BIN/BepInEx/VampireSurvivorsUx.dll" "$OUT/VampireSurvivorsUx.dll"
+fi
 
-echo "== BepInExMono (macOS): $MONO_ASM"
-dotnet build "$PROJ" -c Release -p:Loader=BepInExMono \
-  -p:GameAsmPath="$MONO_ASM" -p:LoaderLibPath="$MONO_LIB" -p:CopyToMods=false
-cp "$BIN/BepInExMono/VampireSurvivorsUx.dll" "$OUT/VampireSurvivorsUx-mono.dll"
+if [ "$ONLY" != il2cpp ]; then
+  echo "== BepInExMono (macOS): $MONO_ASM"
+  dotnet build "$PROJ" -c Release -p:Loader=BepInExMono \
+    -p:GameAsmPath="$MONO_ASM" -p:LoaderLibPath="$MONO_LIB" -p:CopyToMods=false
+  cp "$BIN/BepInExMono/VampireSurvivorsUx.dll" "$OUT/VampireSurvivorsUx-mono.dll"
+fi
 
 echo
 echo "Release files in $OUT:"

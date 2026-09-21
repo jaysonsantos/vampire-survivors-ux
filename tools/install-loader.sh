@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Installs a mod loader into the game folder (AGENTS.md step 1.6).
 # Usage: tools/install-loader.sh melonloader | bepinex | bepinex-macos
-# Downloads go to reference/loaders/ (not committed).
+# Downloads go to reference/loaders/ (not committed). Set LOADER_DL to select another folder.
+# tools/deploy-macos.sh sets it, because it runs this script on the Mac without the repository.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-DL="$REPO/reference/loaders"
+DL="${LOADER_DL:-$REPO/reference/loaders}"
 mkdir -p "$DL"
 
 case "${1:-}" in

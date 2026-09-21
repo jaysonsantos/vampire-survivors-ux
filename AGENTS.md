@@ -69,7 +69,8 @@ Example setup: 4 characters, all CPU, all `Aggressive`.
 | `src/VampireSurvivorsUx/` | The mod. One csproj, one core, three loader entry points. |
 | `reference/loaders/` | Loader zip files that `tools/install-loader.sh` downloads. |
 | `tools/gen-interop.sh` | Makes interop assemblies from `GameAssembly.dll` with Cpp2IL and Il2CppInterop. |
-| `tools/build-release.sh` | Builds the two release files into `dist/`. |
+| `tools/build-release.sh` | Builds the two release files into `dist/`. `ONLY=il2cpp` or `ONLY=mono` builds one file. |
+| `tools/deploy-macos.sh` | Builds the Mono file on this computer and installs it on a Mac through SSH. |
 
 Public repository: `github.com/jaysonsantos/vampire-survivors-ux` (MIT). `README.md` has the install steps for players.
 
@@ -163,6 +164,29 @@ nix develop -c dotnet build src/VampireSurvivorsUx/VampireSurvivorsUx.csproj -c 
   -p:GameAsmPath=$PWD/reference/managed-mono-build25016043 \
   -p:LoaderLibPath=$PWD/reference/loaders/bepinex5/BepInEx/core -p:CopyToMods=false
 ```
+
+### Build on the PC and install on a Mac through SSH
+
+```sh
+nix develop -c tools/deploy-macos.sh <user@host>
+```
+
+The script does these steps:
+
+1. It checks that `Vampire_Survivors.app` is in the game folder of the Mac. `REMOTE_GAME_PATH` selects another
+   folder than the Steam library in the home folder.
+2. When `BepInEx/core` or `run_bepinex.sh` is absent, or with `--loader`, it sends `tools/install-loader.sh`
+   to `bash -s` on the Mac. `LOADER_DL` moves the download folder to `~/Library/Caches/vampire-survivors-ux`,
+   because the Mac has no repository. Do not use `--loader` while the game runs on the Mac: `unzip` writes
+   into the loader files that the game has open.
+3. It runs `ONLY=mono tools/build-release.sh` with the local reference assemblies.
+4. It sends the file with `cat` through SSH to the home folder, then `mv` puts it in `BepInEx/plugins/`.
+   `scp` has quote problems with the space in the game path. `mv` replaces the file in one step, so a game
+   that runs keeps the old file until its next start.
+5. It compares the SHA-256 of the two files and tells you when the game runs on the Mac.
+
+The Mac needs SSH access with a key (`BatchMode=yes`). Tested on 2026-09-21 with the real game folder and with
+a test folder that has a space in its name and no loader.
 
 ## Step 3: Make a release
 

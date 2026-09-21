@@ -139,6 +139,10 @@ cannot patch `arm64` code.
 
 The script `tools/install-loader.sh bepinex-macos` does steps 2 to 4 on a Mac with the repository.
 
+From a PC with the repository, `tools/deploy-macos.sh <user@host>` does steps 2 to 5 through SSH. It builds
+the Mono file on the PC, installs the loader on the Mac when it is absent, and copies the file to
+`BepInEx/plugins/`. The Mac needs no repository and no .NET SDK.
+
 ## License
 
 MIT. See `LICENSE`.
