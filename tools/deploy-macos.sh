@@ -63,6 +63,11 @@ esac
 echo "Game folder: $RGAME"
 
 if [ "$FORCE_LOADER" -eq 1 ]; then
+  # unzip writes into the loader files that a game process has open.
+  if "${SSH[@]}" "pgrep -f 'Vampire_Survivors.app/Contents/MacOS' > /dev/null"; then
+    echo "The game runs on the Mac. Close it before the loader install." >&2
+    exit 1
+  fi
   echo "== Install BepInEx 5 on the Mac"
   # shellcheck disable=SC2016
   "${SSH[@]}" "GAME_PATH=$(printf '%q' "$RGAME")"' LOADER_DL="$HOME/Library/Caches/vampire-survivors-ux" bash -s -- bepinex-macos' \

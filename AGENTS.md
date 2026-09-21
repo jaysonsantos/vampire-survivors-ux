@@ -177,7 +177,7 @@ The script does these steps:
    folder than the Steam library in the home folder.
 2. When `BepInEx/core` or `run_bepinex.sh` is absent, or with `--loader`, it sends `tools/install-loader.sh`
    to `bash -s` on the Mac. `LOADER_DL` moves the download folder to `~/Library/Caches/vampire-survivors-ux`,
-   because the Mac has no repository. Do not use `--loader` while the game runs on the Mac: `unzip` writes
+   because the Mac has no repository. The script stops when the game runs on the Mac, because `unzip` writes
    into the loader files that the game has open.
 3. It runs `ONLY=mono tools/build-release.sh` with the local reference assemblies.
 4. It sends the file with `cat` through SSH to the home folder, then `mv` puts it in `BepInEx/plugins/`.
